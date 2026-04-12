@@ -22,6 +22,7 @@ const SERVICE_META = {
     staticRedirect: true,
     description: 'Redirects Google Fonts to fonts.bunny.net — a privacy-friendly, GDPR-compliant CDN. No Google tracking. Works for every font.',
   },
+  imgur: { label: 'Imgur', target: 'Rimgo' },
 };
 
 function debounce(fn, ms) {

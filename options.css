@@ -130,15 +130,17 @@ html, body {
   background: var(--peach); /* default */
 }
 
-.section--youtube::before    { background: #C97A52; }
-.section--reddit::before     { background: #72B898; }
+.section--youtube::before     { background: #C97A52; }
+.section--reddit::before      { background: #72B898; }
 .section--googlefonts::before { background: #9E90CC; }
+.section--imgur::before       { background: #5B8FBF; }
 
 /* Animation stagger — driven by order class set in JS */
 .section--order-0 { animation-delay: 0s;     }
 .section--order-1 { animation-delay: 0.07s;  }
 .section--order-2 { animation-delay: 0.14s;  }
 .section--order-3 { animation-delay: 0.21s;  }
+.section--order-4 { animation-delay: 0.28s;  }
 
 .section-header {
   padding: 18px 22px 18px 26px;

@@ -34,11 +34,13 @@
 import { youtubeService } from './youtube.js';
 import { redditService } from './reddit.js';
 import { googleFontsService } from './googlefonts.js';
+import { imgurService } from './imgur.js';
 
 const SERVICES = [
   youtubeService,
   redditService,
   googleFontsService,
+  imgurService,
 ];
 
 /**
