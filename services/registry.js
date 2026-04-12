@@ -35,12 +35,14 @@ import { youtubeService } from './youtube.js';
 import { redditService } from './reddit.js';
 import { googleFontsService } from './googlefonts.js';
 import { imgurService } from './imgur.js';
+import { tiktokService } from './tiktok.js';
 
 const SERVICES = [
   youtubeService,
   redditService,
   googleFontsService,
   imgurService,
+  tiktokService,
 ];
 
 /**

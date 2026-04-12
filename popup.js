@@ -17,7 +17,8 @@ const SERVICE_META = {
   youtube:     { label: 'YouTube',      target: 'Invidious',  accentColor: '#FFBA93' },
   reddit:      { label: 'Reddit',       target: 'Redlib',     accentColor: '#98D4B4' },
   googlefonts: { label: 'Google Fonts', target: 'Bunny Fonts', accentColor: '#C9B8F0', staticRedirect: true },
-  imgur:       { label: 'Imgur',        target: 'Rimgo',      accentColor: '#8EC0E8' },
+  imgur:       { label: 'Imgur',   target: 'Rimgo',    accentColor: '#8EC0E8' },
+  tiktok:      { label: 'TikTok', target: 'ProxiTok', accentColor: '#D9A0BC' },
 };
 
 // ─── Card rendering ───────────────────────────────────────────────────────────

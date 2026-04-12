@@ -1,0 +1,6 @@
+[
+  { "clearnet": "https://proxitok.pabloferreiro.es", "cdn": false, "country": "ES" },
+  { "clearnet": "https://proxitok.esmailelbob.xyz",  "cdn": false, "country": "CA" },
+  { "clearnet": "https://tt.vern.cc",                "cdn": false, "country": "US" },
+  { "clearnet": "https://proxitok.privacydev.net",   "cdn": false, "country": "FR" }
+]

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Switcheroo",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Redirect YouTube and Reddit to privacy-friendly frontends.",
   "permissions": [
     "declarativeNetRequest",
