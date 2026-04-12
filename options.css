@@ -115,14 +115,24 @@ html, body {
   animation-delay: calc(var(--order, 0) * 0.07s);
 }
 
-/* Left accent stripe — colour set via --section-accent in JS */
+/* Left accent stripe — colour driven by service class */
 .section::before {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 4px;
-  background: var(--section-accent, var(--peach));
+  background: var(--peach); /* default */
 }
+
+.section--youtube::before    { background: #C97A52; }
+.section--reddit::before     { background: #72B898; }
+.section--googlefonts::before { background: #9E90CC; }
+
+/* Animation stagger — driven by order class set in JS */
+.section--order-0 { animation-delay: 0s;     }
+.section--order-1 { animation-delay: 0.07s;  }
+.section--order-2 { animation-delay: 0.14s;  }
+.section--order-3 { animation-delay: 0.21s;  }
 
 .section-header {
   padding: 18px 22px 18px 26px;

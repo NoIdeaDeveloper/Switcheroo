@@ -14,12 +14,11 @@ function sendMessage(message) {
 }
 
 const SERVICE_META = {
-  youtube: { label: 'YouTube', target: 'Invidious', accentColor: '#C97A52' },
-  reddit:  { label: 'Reddit',  target: 'Redlib',    accentColor: '#72B898' },
+  youtube: { label: 'YouTube', target: 'Invidious' },
+  reddit:  { label: 'Reddit',  target: 'Redlib'    },
   googlefonts: {
     label: 'Google Fonts',
     target: 'Bunny Fonts',
-    accentColor: '#9E90CC',
     staticRedirect: true,
     description: 'Redirects Google Fonts to fonts.bunny.net — a privacy-friendly, GDPR-compliant CDN. No Google tracking. Works for every font.',
   },
@@ -42,10 +41,8 @@ function buildSection(serviceId, settings, instances, order = 0) {
   const svc  = settings[serviceId] ?? {};
 
   const section = document.createElement('section');
-  section.className = 'section';
+  section.className = `section section--${serviceId} section--order-${order}`;
   section.id = `section-${serviceId}`;
-  section.style.setProperty('--order', order);
-  if (meta.accentColor) section.style.setProperty('--section-accent', meta.accentColor);
 
   // Header
   const header = document.createElement('div');
