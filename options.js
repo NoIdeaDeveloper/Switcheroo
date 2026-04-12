@@ -14,11 +14,12 @@ function sendMessage(message) {
 }
 
 const SERVICE_META = {
-  youtube: { label: 'YouTube', target: 'Invidious' },
-  reddit:  { label: 'Reddit',  target: 'Redlib'    },
+  youtube: { label: 'YouTube', target: 'Invidious', accentColor: '#C97A52' },
+  reddit:  { label: 'Reddit',  target: 'Redlib',    accentColor: '#72B898' },
   googlefonts: {
     label: 'Google Fonts',
     target: 'Bunny Fonts',
+    accentColor: '#9E90CC',
     staticRedirect: true,
     description: 'Redirects Google Fonts to fonts.bunny.net — a privacy-friendly, GDPR-compliant CDN. No Google tracking. Works for every font.',
   },
@@ -36,13 +37,15 @@ const debouncedSave = debounce(async (serviceId, patch) => {
 
 // ─── Section builder ──────────────────────────────────────────────────────────
 
-function buildSection(serviceId, settings, instances) {
+function buildSection(serviceId, settings, instances, order = 0) {
   const meta = SERVICE_META[serviceId];
   const svc  = settings[serviceId] ?? {};
 
   const section = document.createElement('section');
   section.className = 'section';
   section.id = `section-${serviceId}`;
+  section.style.setProperty('--order', order);
+  if (meta.accentColor) section.style.setProperty('--section-accent', meta.accentColor);
 
   // Header
   const header = document.createElement('div');
@@ -66,11 +69,21 @@ function buildSection(serviceId, settings, instances) {
 
   if (meta.staticRedirect) {
     // Static-redirect services (e.g. Google Fonts) have a single fixed target
-    // and no instance list to manage — just show an info description.
+    // and no instance list to manage — show a styled info box.
+    const box = document.createElement('div');
+    box.className = 'static-redirect-box';
+
     const desc = document.createElement('p');
     desc.className = 'static-redirect-desc';
     desc.textContent = meta.description ?? '';
-    body.append(desc);
+
+    const pill = document.createElement('span');
+    pill.className = 'static-redirect-pill';
+    const target = settings[serviceId]?.currentInstance ?? `https://${meta.target.toLowerCase().replace(' ', '')}`;
+    pill.textContent = `→ ${target.replace('https://', '')}`;
+
+    box.append(desc, pill);
+    body.append(box);
   } else {
     body.append(
       buildModeSelector(serviceId, svc),
@@ -119,8 +132,8 @@ function buildModeSelector(serviceId, svc) {
   sel.className = 'mode-selector';
 
   const modes = [
-    { value: 'random', text: '🎲  Random (rotates hourly)' },
-    { value: 'fixed',  text: '📌  Fixed instance'          },
+    { value: 'random', text: 'Random' },
+    { value: 'fixed',  text: 'Fixed'  },
   ];
 
   for (const m of modes) {
@@ -271,7 +284,7 @@ function buildInstanceList(serviceId, svc, instances) {
 
   headerRow.append(lbl);
   const rightRow = document.createElement('div');
-  rightRow.style.cssText = 'display:flex;align-items:center;gap:10px';
+  rightRow.className = 'instance-list-actions';
   rightRow.append(countEl, refreshBtn);
   headerRow.append(rightRow);
 
@@ -435,9 +448,10 @@ async function init() {
 
   container.innerHTML = '';
 
+  let order = 0;
   for (const id of Object.keys(SERVICE_META)) {
     if (!settings[id]) continue;
-    container.append(buildSection(id, settings, allInstances[id] ?? []));
+    container.append(buildSection(id, settings, allInstances[id] ?? [], order++));
   }
 
   // Scroll to a specific section if the popup sent us there
