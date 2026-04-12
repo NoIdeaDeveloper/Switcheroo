@@ -7,7 +7,8 @@
  *   1001  /shorts/VIDEO_ID            → /watch?v=\2
  *   1002  /results?search_query=QUERY → /search?q=\2
  *   1003  /playlist?list=LIST_ID      → /playlist?list=\2
- *   1004  /embed/VIDEO_ID             → /embed/\2   (main+sub frame)
+ *   1004  youtube.com/embed/VIDEO_ID             → /embed/\2   (main+sub frame)
+ *   1009  youtube-nocookie.com/embed/VIDEO_ID    → /embed/\2   (main+sub frame)
  *   1005  /channel/CHANNEL_ID         → /channel/\2
  *   1006  /@HANDLE                    → /@\2
  *   1007  /user/USERNAME              → /user/\2
@@ -133,12 +134,24 @@ export const youtubeService = {
         action: { type: 'redirect', ...sub('/playlist?list=\\2') },
       },
 
-      // 1004 — /embed/VIDEO_ID  (also intercepts sub_frame for embedded players)
+      // 1004 — youtube.com/embed/VIDEO_ID  (also intercepts sub_frame for embedded players)
       {
         ...shared,
         id: 1004,
         condition: cond(
-          '^https?://(www\\.)?youtube(?:-nocookie)?\\.com/embed/([a-zA-Z0-9_-]{11})',
+          '^https?://(www\\.)?youtube\\.com/embed/([a-zA-Z0-9_-]{11})',
+          ['main_frame', 'sub_frame']
+        ),
+        action: { type: 'redirect', ...sub('/embed/\\2') },
+      },
+
+      // 1009 — youtube-nocookie.com/embed/VIDEO_ID  (privacy-enhanced embeds)
+      // Split from 1004 to avoid (?:-nocookie)? optional group inflating compiled DFA size.
+      {
+        ...shared,
+        id: 1009,
+        condition: cond(
+          '^https?://(www\\.)?youtube-nocookie\\.com/embed/([a-zA-Z0-9_-]{11})',
           ['main_frame', 'sub_frame']
         ),
         action: { type: 'redirect', ...sub('/embed/\\2') },
