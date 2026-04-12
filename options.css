@@ -102,6 +102,12 @@ html, body {
   gap: 24px;
 }
 
+#services-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 /* ── Section card ─────────────────────────────────────────────── */
 
 .section {
@@ -269,6 +275,15 @@ html, body {
 }
 
 .fixed-instance-wrap.visible { display: flex; }
+
+/* Random-mode-only controls (rotation interval + instance list) */
+.random-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.random-controls.hidden { display: none; }
 
 .instance-select {
   width: 100%;

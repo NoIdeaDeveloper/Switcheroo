@@ -203,6 +203,8 @@ export const youtubeService = {
       currentInstance: null,   // actively used instance (set by background.js)
       enabledInstances: [],    // empty = all instances enabled (opt-out model)
       allowCloudflare: false,
+      rotationIntervalMs: 3_600_000, // how often to rotate in random mode (ms)
+      lastRotatedAt: 0,              // timestamp of last rotation (set by background.js)
     };
   },
 };

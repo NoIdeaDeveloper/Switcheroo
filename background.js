@@ -50,9 +50,10 @@ async function rotateInstance(service) {
 
   const chosen = resolveCurrentInstance(service, settings, instances);
 
-  if (chosen !== settings.currentInstance) {
-    await setServiceSettings(service.id, { currentInstance: chosen });
-  }
+  // Always record the rotation attempt time so the interval logic stays accurate.
+  const patch = { lastRotatedAt: Date.now() };
+  if (chosen !== settings.currentInstance) patch.currentInstance = chosen;
+  await setServiceSettings(service.id, patch);
 
   return chosen;
 }
@@ -141,16 +142,30 @@ chrome.alarms.onAlarm.addListener(async alarm => {
 
   const services = getAll();
   const extensionId = chrome.runtime.id;
+  const now = Date.now();
 
-  // Fetch fresh instance data for services that have a live API (skip static-redirect services).
+  // Fetch fresh instance data for services that have a live API.
   await Promise.all(
     services
       .filter(s => s.instanceFetcher.url)
       .map(service => fetchInstances(service).catch(() => {}))
   );
 
-  // Rotate instances and rebuild rules
-  await rotateAllInstances(extensionId);
+  // Rotate only random-mode services whose configured interval has elapsed.
+  // Services set to 'startup only' (rotationIntervalMs === 0) are skipped here
+  // but are still rotated by lightStartup on browser start.
+  for (const service of services) {
+    const settings = await getServiceSettings(service.id);
+    if (settings.mode !== 'random') continue;
+    const intervalMs = settings.rotationIntervalMs ?? 3_600_000;
+    if (intervalMs === 0) continue;
+    if (now - (settings.lastRotatedAt ?? 0) >= intervalMs) {
+      await rotateInstance(service);
+    }
+  }
+
+  // Rebuild rules — instance lists may have changed even without rotation.
+  await rebuildAllRules(extensionId);
 });
 
 chrome.storage.onChanged.addListener(async (changes, area) => {
@@ -226,9 +241,18 @@ async function handleMessage(message) {
       ]);
       const merged = { ...current, ...settings };
 
+      // Only re-resolve the active instance when settings that affect which
+      // instance is used have actually changed. Changing rotationIntervalMs,
+      // lastRotatedAt, etc. must not silently re-pick a random instance.
+      const instanceSelectionChanged =
+        'mode' in settings ||
+        'fixedInstance' in settings ||
+        'enabledInstances' in settings ||
+        'allowCloudflare' in settings;
+
       if (merged.mode === 'fixed' && merged.fixedInstance) {
         merged.currentInstance = merged.fixedInstance;
-      } else if (merged.mode === 'random') {
+      } else if (merged.mode === 'random' && instanceSelectionChanged) {
         merged.currentInstance = resolveCurrentInstance(service, merged, instances);
       }
 

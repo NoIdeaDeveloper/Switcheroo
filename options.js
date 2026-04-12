@@ -82,10 +82,21 @@ function buildSection(serviceId, settings, instances, order = 0) {
     box.append(desc, pill);
     body.append(box);
   } else {
+    // Random-mode-only controls: rotation interval + instance list.
+    // Hidden when mode is 'fixed' so the instance checklist doesn't confuse
+    // users who have already selected a specific fixed instance.
+    const randomControls = document.createElement('div');
+    randomControls.id = `random-controls-${serviceId}`;
+    randomControls.className = `random-controls${svc.mode === 'fixed' ? ' hidden' : ''}`;
+    randomControls.append(
+      buildRotationInterval(serviceId, svc),
+      buildInstanceList(serviceId, svc, instances),
+    );
+
     body.append(
       buildModeSelector(serviceId, svc),
       buildFixedPicker(serviceId, svc, instances),
-      buildInstanceList(serviceId, svc, instances),
+      randomControls,
     );
   }
 
@@ -142,7 +153,9 @@ function buildModeSelector(serviceId, svc) {
       sel.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const fixedWrap = document.getElementById(`fixed-wrap-${serviceId}`);
+      const randomControls = document.getElementById(`random-controls-${serviceId}`);
       if (fixedWrap) fixedWrap.classList.toggle('visible', m.value === 'fixed');
+      if (randomControls) randomControls.classList.toggle('hidden', m.value !== 'random');
       debouncedSave(serviceId, { mode: m.value });
     });
     sel.append(btn);
@@ -193,8 +206,13 @@ function buildFixedPicker(serviceId, svc, instances) {
     select.append(grp);
   }
 
+  // Save immediately — no debounce. Fixed instance changes must apply before
+  // the user navigates away, and there is no rapid-fire scenario to debounce.
   select.addEventListener('change', () => {
-    if (select.value) debouncedSave(serviceId, { fixedInstance: select.value });
+    if (select.value) {
+      sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: select.value } })
+        .catch(err => console.error('[Switcheroo] Save failed:', err));
+    }
   });
 
   grp1.append(lbl1, select);
@@ -228,7 +246,8 @@ function buildFixedPicker(serviceId, svc, instances) {
       select.insertBefore(opt, select.options[1]);
     }
     select.value = val;
-    debouncedSave(serviceId, { fixedInstance: val });
+    sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: val } })
+      .catch(err => console.error('[Switcheroo] Save failed:', err));
     input.value = '';
   });
 
@@ -238,6 +257,41 @@ function buildFixedPicker(serviceId, svc, instances) {
 
   wrap.append(grp1, grp2);
   return wrap;
+}
+
+// ── Rotation interval ─────────────────────────────────────────────────────────
+
+const ROTATION_OPTIONS = [
+  { label: 'Every hour (default)', value: 3_600_000 },
+  { label: 'Every 6 hours',        value: 21_600_000 },
+  { label: 'Every day',            value: 86_400_000 },
+  { label: 'On startup only',      value: 0 },
+];
+
+function buildRotationInterval(serviceId, svc) {
+  const group = document.createElement('div');
+  group.className = 'field-group';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'field-label';
+  lbl.textContent = 'Rotation interval';
+
+  const select = document.createElement('select');
+  select.className = 'instance-select';
+
+  const current = svc.rotationIntervalMs ?? 3_600_000;
+  for (const opt of ROTATION_OPTIONS) {
+    const o = new Option(opt.label, String(opt.value));
+    if (current === opt.value) o.selected = true;
+    select.append(o);
+  }
+
+  select.addEventListener('change', () => {
+    debouncedSave(serviceId, { rotationIntervalMs: Number(select.value) });
+  });
+
+  group.append(lbl, select);
+  return group;
 }
 
 // ── Instance list ─────────────────────────────────────────────────────────────
