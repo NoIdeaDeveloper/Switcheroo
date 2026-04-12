@@ -3,6 +3,11 @@
  * No network requests. All data flows through sendMessage → background.
  */
 
+// Apply dark mode from storage immediately to minimise flash before init() runs.
+chrome.storage.local.get('globalSettings', result => {
+  if (result.globalSettings?.darkMode) document.documentElement.dataset.theme = 'dark';
+});
+
 function sendMessage(message) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(message, response => {

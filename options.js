@@ -3,6 +3,11 @@
  * No network requests. All data flows through sendMessage → background.
  */
 
+// Apply dark mode from storage immediately to minimise flash before init() runs.
+chrome.storage.local.get('globalSettings', result => {
+  if (result.globalSettings?.darkMode) document.documentElement.dataset.theme = 'dark';
+});
+
 function sendMessage(message) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(message, response => {
@@ -116,7 +121,49 @@ function buildGlobalSection(globalSettings) {
     'each list manually using the Refresh button in each service section.';
 
   group.append(lbl, select, hint);
-  body.append(group);
+
+  // Dark mode toggle
+  const dmGroup = document.createElement('div');
+  dmGroup.className = 'field-group';
+
+  const dmLbl = document.createElement('div');
+  dmLbl.className = 'field-label';
+  dmLbl.textContent = 'Appearance';
+
+  const dmRow = document.createElement('div');
+  dmRow.className = 'dark-mode-row';
+
+  const dmToggleLabel = document.createElement('label');
+  dmToggleLabel.className = 'toggle';
+  dmToggleLabel.setAttribute('aria-label', 'Enable dark mode');
+
+  const dmInput = document.createElement('input');
+  dmInput.type = 'checkbox';
+  dmInput.checked = globalSettings.darkMode ?? false;
+
+  const dmTrack = document.createElement('span');
+  dmTrack.className = 'toggle-track';
+
+  const dmThumb = document.createElement('span');
+  dmThumb.className = 'toggle-thumb';
+
+  dmToggleLabel.append(dmInput, dmTrack, dmThumb);
+
+  const dmText = document.createElement('span');
+  dmText.className = 'dark-mode-text';
+  dmText.textContent = 'Dark mode';
+
+  dmInput.addEventListener('change', () => {
+    const dark = dmInput.checked;
+    document.documentElement.dataset.theme = dark ? 'dark' : '';
+    sendMessage({ action: 'setGlobalSettings', settings: { darkMode: dark } })
+      .catch(err => console.error('[Switcheroo] setGlobalSettings failed:', err));
+  });
+
+  dmRow.append(dmToggleLabel, dmText);
+  dmGroup.append(dmLbl, dmRow);
+
+  body.append(group, dmGroup);
   bodyWrap.append(body);
   section.append(bodyWrap);
   return section;

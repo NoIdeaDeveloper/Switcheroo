@@ -36,6 +36,31 @@
   --font:         'Nunito', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
 
+/* ── Dark mode palette ────────────────────────────────────────── */
+
+html[data-theme="dark"] {
+  --bg:           #1C1712;
+  --bg-header:    #221A0E;
+  --card:         #2A2118;
+  --peach:        #D49070;
+  --peach-dk:     #E8A880;
+  --peach-lt:     #4A2C18;
+  --sage:         #6AAE8C;
+  --sage-dk:      #8CC8A8;
+  --lavender:     #B0A0D8;
+  --text:         #EDE0D4;
+  --text-mid:     #B89880;
+  --text-muted:   #7A6050;
+  --border:       #3C3028;
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.5);
+  --shadow-card:  0 2px 12px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-hover: 0 4px 18px rgba(0,0,0,0.7), 0 1px 4px rgba(0,0,0,0.5);
+}
+
+html[data-theme="dark"] .header {
+  background: linear-gradient(160deg, #241C12 0%, #2A2118 100%);
+}
+
 html { width: 320px; }
 
 body {

@@ -14,6 +14,7 @@ const GLOBAL_DEFAULTS = {
   // How often to automatically fetch updated instance lists.
   // null = Off (never fetch automatically; user must refresh manually).
   instanceRefreshIntervalMs: 3_600_000, // 1 hour
+  darkMode: false,
 };
 
 // ─── Settings ────────────────────────────────────────────────────────────────
