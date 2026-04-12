@@ -21,6 +21,10 @@
  * forwarded (v, q, list, embed ID). UTM params, si, pp, feature, ab_channel
  * are discarded naturally because we reconstruct the URL from scratch.
  *
+ * Regex note: patterns do NOT use [^#]* or similar broad Unicode character
+ * classes. Chrome's DNR RE2 compiler expands these to large DFAs that exceed
+ * the 2KB compiled-regex memory limit. All character classes are ASCII-bounded.
+ *
  * Known limitation: timestamp (?t=) and playlist context on watch pages are
  * not forwarded. This is an acceptable tradeoff to keep DNR rules simple and
  * to avoid forwarding any unnecessary URL data.
@@ -95,11 +99,13 @@ export const youtubeService = {
     const sub = path => ({ redirect: { regexSubstitution: `${instance}${path}` } });
 
     return [
-      // 1000 — /watch?v=VIDEO_ID  (param may appear anywhere in the query string)
+      // 1000 — /watch?v=VIDEO_ID
+      // v= is always the first query param in YouTube watch URLs.
+      // Trailing params (&list=, &t=, etc.) are naturally ignored by the regex.
       {
         ...shared,
         id: 1000,
-        condition: cond('^https?://(www\\.)?youtube\\.com/watch\\?(?:[^#]*&)?v=([a-zA-Z0-9_-]{11})'),
+        condition: cond('^https?://(www\\.)?youtube\\.com/watch\\?v=([a-zA-Z0-9_-]{11})'),
         action: { type: 'redirect', ...sub('/watch?v=\\2') },
       },
 
@@ -115,7 +121,7 @@ export const youtubeService = {
       {
         ...shared,
         id: 1002,
-        condition: cond('^https?://(www\\.)?youtube\\.com/results\\?(?:[^#]*&)?search_query=([^&#]*)'),
+        condition: cond('^https?://(www\\.)?youtube\\.com/results\\?search_query=([^&#]*)'),
         action: { type: 'redirect', ...sub('/search?q=\\2') },
       },
 
@@ -123,7 +129,7 @@ export const youtubeService = {
       {
         ...shared,
         id: 1003,
-        condition: cond('^https?://(www\\.)?youtube\\.com/playlist\\?(?:[^#]*&)?list=([^&#]*)'),
+        condition: cond('^https?://(www\\.)?youtube\\.com/playlist\\?list=([^&#]*)'),
         action: { type: 'redirect', ...sub('/playlist?list=\\2') },
       },
 
