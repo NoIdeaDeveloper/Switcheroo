@@ -33,7 +33,10 @@ import {
 import { rebuildAllRules, applyRulesForService } from './utils/dnr.js';
 
 const ALARM_NAME = 'instanceRefresh';
-const ALARM_PERIOD_MINUTES = 60;
+// 1-minute tick so sub-hour rotation intervals fire accurately.
+// Instance list fetches are gated by cache staleness, so the upstream APIs
+// are still only contacted at most once per hour regardless of alarm frequency.
+const ALARM_PERIOD_MINUTES = 1;
 
 // ─── Instance rotation ────────────────────────────────────────────────────────
 
@@ -75,7 +78,9 @@ async function rotateAllInstances(extensionId) {
  */
 function registerAlarm() {
   chrome.alarms.get(ALARM_NAME, alarm => {
-    if (!alarm) {
+    // Recreate the alarm if it doesn't exist or has a different period.
+    // This ensures a period change (e.g. after an extension update) takes effect.
+    if (!alarm || alarm.periodInMinutes !== ALARM_PERIOD_MINUTES) {
       chrome.alarms.create(ALARM_NAME, { periodInMinutes: ALARM_PERIOD_MINUTES });
     }
   });
@@ -144,11 +149,15 @@ chrome.alarms.onAlarm.addListener(async alarm => {
   const extensionId = chrome.runtime.id;
   const now = Date.now();
 
-  // Fetch fresh instance data for services that have a live API.
+  // Fetch fresh instance data only when the cache is actually stale.
+  // This keeps upstream API calls at ~hourly even though the alarm fires every minute.
   await Promise.all(
     services
       .filter(s => s.instanceFetcher.url)
-      .map(service => fetchInstances(service).catch(() => {}))
+      .map(async service => {
+        const stale = await isCacheStale(service.id, service.instanceFetcher.cacheTTLMs);
+        if (stale) await fetchInstances(service).catch(() => {});
+      })
   );
 
   // Rotate only random-mode services whose configured interval has elapsed.

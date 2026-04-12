@@ -262,10 +262,12 @@ function buildFixedPicker(serviceId, svc, instances) {
 // ── Rotation interval ─────────────────────────────────────────────────────────
 
 const ROTATION_OPTIONS = [
-  { label: 'Every hour (default)', value: 3_600_000 },
-  { label: 'Every 6 hours',        value: 21_600_000 },
-  { label: 'Every day',            value: 86_400_000 },
-  { label: 'On startup only',      value: 0 },
+  { label: 'Every minute (approx. per-redirect)', value: 60_000 },
+  { label: 'Every 15 minutes',                    value: 900_000 },
+  { label: 'Every hour (default)',                 value: 3_600_000 },
+  { label: 'Every 6 hours',                        value: 21_600_000 },
+  { label: 'Every day',                            value: 86_400_000 },
+  { label: 'On startup only',                      value: 0 },
 ];
 
 function buildRotationInterval(serviceId, svc) {
