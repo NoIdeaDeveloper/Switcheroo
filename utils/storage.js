@@ -8,6 +8,13 @@
 
 const SETTINGS_KEY = 'settings';
 const INSTANCE_CACHE_KEY = 'instanceCache';
+const GLOBAL_SETTINGS_KEY = 'globalSettings';
+
+const GLOBAL_DEFAULTS = {
+  // How often to automatically fetch updated instance lists.
+  // null = Off (never fetch automatically; user must refresh manually).
+  instanceRefreshIntervalMs: 3_600_000, // 1 hour
+};
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -65,6 +72,37 @@ export async function initializeDefaults(services) {
   }
 
   await chrome.storage.local.set({ [SETTINGS_KEY]: merged });
+}
+
+// ─── Global settings ─────────────────────────────────────────────────────────
+
+/**
+ * Returns the global (cross-service) settings, merged with defaults.
+ * @returns {Promise<{instanceRefreshIntervalMs: number|null}>}
+ */
+export async function getGlobalSettings() {
+  const result = await chrome.storage.local.get(GLOBAL_SETTINGS_KEY);
+  return { ...GLOBAL_DEFAULTS, ...(result[GLOBAL_SETTINGS_KEY] ?? {}) };
+}
+
+/**
+ * Merges a patch into the global settings.
+ * @param {object} patch
+ */
+export async function setGlobalSettings(patch) {
+  const current = await getGlobalSettings();
+  await chrome.storage.local.set({ [GLOBAL_SETTINGS_KEY]: { ...current, ...patch } });
+}
+
+/**
+ * Writes global defaults to storage without overwriting existing values.
+ * Safe to call on every install/update.
+ */
+export async function initializeGlobalDefaults() {
+  const result = await chrome.storage.local.get(GLOBAL_SETTINGS_KEY);
+  if (!result[GLOBAL_SETTINGS_KEY]) {
+    await chrome.storage.local.set({ [GLOBAL_SETTINGS_KEY]: GLOBAL_DEFAULTS });
+  }
 }
 
 // ─── Instance cache ───────────────────────────────────────────────────────────

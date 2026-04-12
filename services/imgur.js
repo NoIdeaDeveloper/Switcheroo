@@ -47,9 +47,15 @@ export const imgurService = {
         .map(inst => ({
           url: inst.url.replace(/\/$/, ''),
           country: inst.country ?? undefined,
-          uptime: undefined,   // rimgo instances.json does not expose uptime
+          uptime: undefined,
           cloudflare: false,
           collectsData: typeof inst.note === 'string' && inst.note.includes('Data collected'),
+          meta: (() => {
+            const m = {};
+            if (inst.provider) m['Provider'] = inst.provider;
+            if (inst.note) m['Status'] = inst.note.replace(/[\u2705\u26a0\ufe0f]/gu, '').trim();
+            return Object.keys(m).length ? m : undefined;
+          })(),
         }));
     },
 

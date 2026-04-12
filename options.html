@@ -51,17 +51,22 @@
             not uploaded to Google.
           </li>
           <li>
-            <strong>Two network requests are made</strong> to fetch up-to-date
-            instance lists (at install time and every hour). These requests go
-            to:
+            <strong>Network requests are made</strong> to fetch up-to-date
+            instance lists. By default this happens every hour; you can change
+            or disable this entirely in the <strong>Instance Lists</strong> card
+            at the top of this page. The requests go to:
             <ul class="sub-list">
-              <li><code>https://api.invidious.io/instances.json</code></li>
-              <li><code>https://raw.githubusercontent.com/redlib-org/…/instances.json</code></li>
+              <li><code>https://api.invidious.io/instances.json</code> — YouTube (Invidious)</li>
+              <li><code>https://raw.githubusercontent.com/redlib-org/redlib-instances/…/instances.json</code> — Reddit (Redlib)</li>
+              <li><code>https://rimgo.codeberg.page/api.json</code> — Imgur (Rimgo)</li>
+              <li><code>https://raw.githubusercontent.com/pablouser1/ProxiTok/…/instances.json</code> — TikTok (ProxiTok)</li>
+              <li><code>https://git.sr.ht/~edwardloveall/scribe/blob/main/docs/instances.md</code> — Medium (Scribe)</li>
             </ul>
-            These requests contain no user data beyond a standard browser
-            request (IP address, User-Agent). They inform the servers that you
-            have Switcheroo installed. If you prefer not to make these requests,
-            you can rely solely on the bundled fallback instance lists.
+            Each request reveals to that server that you have Switcheroo
+            installed (your IP address and User-Agent are visible). No browsing
+            history or redirect activity is included. Set the auto-update
+            interval to <strong>Off</strong> to make zero automatic network
+            calls — you can still refresh each list manually at any time.
           </li>
           <li>
             <strong>Cloudflare instances excluded by default.</strong> Cloudflare

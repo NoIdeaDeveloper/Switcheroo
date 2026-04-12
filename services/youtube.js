@@ -58,12 +58,26 @@ export const youtubeService = {
           typeof data?.uri === 'string' &&
           (data?.monitor?.uptime ?? 0) > 80
         )
-        .map(([, data]) => ({
-          url: data.uri.replace(/\/$/, ''),
-          country: data.region ?? data.stats?.region ?? undefined,
-          uptime: data.monitor?.uptime ?? undefined,
-          cloudflare: false, // Invidious instances list doesn't track Cloudflare
-        }))
+        .map(([, data]) => {
+          const meta = {};
+          const version = data.stats?.software?.version ?? data.stats?.version;
+          if (version) meta['Version'] = version;
+          if (typeof data.stats?.openRegistrations === 'boolean') {
+            meta['Registration'] = data.stats.openRegistrations ? 'Open' : 'Closed';
+          }
+          const users = data.stats?.usage?.users?.total;
+          if (typeof users === 'number') meta['Users'] = users.toLocaleString();
+          if (data.cors === true)  meta['CORS'] = 'Yes';
+          if (data.api  === false) meta['API']  = 'Disabled';
+
+          return {
+            url: data.uri.replace(/\/$/, ''),
+            country: data.region ?? data.stats?.region ?? undefined,
+            uptime: data.monitor?.uptime ?? undefined,
+            cloudflare: false,
+            meta: Object.keys(meta).length ? meta : undefined,
+          };
+        })
         .slice(0, 30); // cap to avoid bloated storage
     },
 

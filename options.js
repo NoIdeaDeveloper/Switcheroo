@@ -14,17 +14,32 @@ function sendMessage(message) {
 }
 
 const SERVICE_META = {
-  youtube: { label: 'YouTube', target: 'Invidious' },
-  reddit:  { label: 'Reddit',  target: 'Redlib'    },
+  youtube: {
+    label: 'YouTube', target: 'Invidious',
+    fetchUrl: 'https://api.invidious.io/instances.json?sort_by=type,users',
+  },
+  reddit: {
+    label: 'Reddit', target: 'Redlib',
+    fetchUrl: 'https://raw.githubusercontent.com/redlib-org/redlib-instances/refs/heads/main/instances.json',
+  },
   googlefonts: {
-    label: 'Google Fonts',
-    target: 'Bunny Fonts',
+    label: 'Google Fonts', target: 'Bunny Fonts',
     staticRedirect: true,
+    fetchUrl: null,
     description: 'Redirects Google Fonts to fonts.bunny.net — a privacy-friendly, GDPR-compliant CDN. No Google tracking. Works for every font.',
   },
-  imgur:  { label: 'Imgur',   target: 'Rimgo'    },
-  tiktok: { label: 'TikTok', target: 'ProxiTok' },
-  scribe: { label: 'Medium', target: 'Scribe'   },
+  imgur: {
+    label: 'Imgur', target: 'Rimgo',
+    fetchUrl: 'https://rimgo.codeberg.page/api.json',
+  },
+  tiktok: {
+    label: 'TikTok', target: 'ProxiTok',
+    fetchUrl: 'https://raw.githubusercontent.com/pablouser1/ProxiTok/refs/heads/master/instances.json',
+  },
+  scribe: {
+    label: 'Medium', target: 'Scribe',
+    fetchUrl: 'https://git.sr.ht/~edwardloveall/scribe/blob/main/docs/instances.md',
+  },
 };
 
 function debounce(fn, ms) {
@@ -36,6 +51,76 @@ const debouncedSave = debounce(async (serviceId, patch) => {
   try { await sendMessage({ action: 'setServiceSettings', serviceId, settings: patch }); }
   catch (err) { console.error('[Switcheroo] Save failed:', err); }
 }, 350);
+
+// ─── Global settings card ─────────────────────────────────────────────────────
+
+const REFRESH_INTERVAL_OPTIONS = [
+  { label: 'Every 30 minutes',   value: 1_800_000   },
+  { label: 'Every hour',         value: 3_600_000   },
+  { label: 'Every 6 hours',      value: 21_600_000  },
+  { label: 'Every 12 hours',     value: 43_200_000  },
+  { label: 'Every day',          value: 86_400_000  },
+  { label: 'Every week',         value: 604_800_000 },
+  { label: 'Off (manual only)',  value: null        },
+];
+
+function buildGlobalSection(globalSettings) {
+  const section = document.createElement('section');
+  section.className = 'section section--global section--order-0';
+  section.id = 'section-global';
+
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.innerHTML = `
+    <div class="section-title-row">
+      <h2 class="section-title">Instance Lists</h2>
+    </div>`;
+  section.append(header);
+
+  const bodyWrap = document.createElement('div');
+  bodyWrap.className = 'section-body-wrap';
+
+  const body = document.createElement('div');
+  body.className = 'section-body';
+
+  // Auto-refresh interval selector
+  const group = document.createElement('div');
+  group.className = 'field-group';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'field-label';
+  lbl.textContent = 'Auto-update interval';
+
+  const select = document.createElement('select');
+  select.className = 'instance-select';
+
+  const current = globalSettings.instanceRefreshIntervalMs;
+  for (const opt of REFRESH_INTERVAL_OPTIONS) {
+    const o = new Option(opt.label, String(opt.value));
+    if (current === opt.value) o.selected = true;
+    select.append(o);
+  }
+
+  select.addEventListener('change', () => {
+    const raw = select.value;
+    const value = raw === 'null' ? null : Number(raw);
+    sendMessage({ action: 'setGlobalSettings', settings: { instanceRefreshIntervalMs: value } })
+      .catch(err => console.error('[Switcheroo] setGlobalSettings failed:', err));
+  });
+
+  const hint = document.createElement('p');
+  hint.className = 'global-setting-hint';
+  hint.textContent =
+    'How often Switcheroo fetches updated instance lists from their sources. ' +
+    'Set to Off to disable all automatic network calls — you can still refresh ' +
+    'each list manually using the Refresh button in each service section.';
+
+  group.append(lbl, select, hint);
+  body.append(group);
+  bodyWrap.append(body);
+  section.append(bodyWrap);
+  return section;
+}
 
 // ─── Section builder ──────────────────────────────────────────────────────────
 
@@ -342,6 +427,15 @@ function buildInstanceList(serviceId, svc, instances) {
   refreshBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.65 2.35A8 8 0 1 0 15 8h-2a6 6 0 1 1-1.1-3.47L10 6h5V1l-1.35 1.35Z" fill="currentColor"/></svg> Refresh`;
 
   refreshBtn.addEventListener('click', async () => {
+    // If auto-refresh is Off, warn the user before making a network call
+    const globalSettings = await sendMessage({ action: 'getGlobalSettings' });
+    if (globalSettings.instanceRefreshIntervalMs === null) {
+      const meta = SERVICE_META[serviceId];
+      if (!meta?.fetchUrl) return; // static-redirect services have nothing to fetch
+      const confirmed = await confirmNetworkFetch(meta.label, meta.fetchUrl);
+      if (!confirmed) return;
+    }
+
     refreshBtn.disabled = true;
     const svg = refreshBtn.querySelector('svg');
     svg?.classList.add('spinning');
@@ -452,42 +546,65 @@ function buildRow(serviceId, svc, inst, flag) {
     cb.addEventListener('change', () => updateEnabled(serviceId, inst.url, cb.checked));
   }
 
+  // Content wrapper holds the main line (url + badges) and optional meta tags below
+  const content = document.createElement('div');
+  content.className = 'instance-row-content';
+
+  const mainLine = document.createElement('div');
+  mainLine.className = 'instance-row-main';
+
   const urlEl = document.createElement('span');
   urlEl.className = 'instance-url';
   urlEl.textContent = inst.url.replace('https://', '');
   urlEl.title = inst.url;
 
-  const meta = document.createElement('div');
-  meta.className = 'instance-meta';
+  const badges = document.createElement('div');
+  badges.className = 'instance-meta';
 
   if (inst.country) {
     const flagEl = document.createElement('span');
     flagEl.className = 'instance-flag';
     flagEl.textContent = countryFlag(inst.country);
     flagEl.title = inst.country;
-    meta.append(flagEl);
+    badges.append(flagEl);
   }
 
   if (typeof inst.uptime === 'number') {
     const up = document.createElement('span');
     up.className = `instance-uptime${inst.uptime < 80 ? ' low' : ''}`;
     up.textContent = `${Math.round(inst.uptime)}%`;
-    meta.append(up);
+    badges.append(up);
   }
 
   if (flag === 'cloudflare') {
     const badge = document.createElement('span');
     badge.className = 'badge-cf';
     badge.textContent = 'CF';
-    meta.append(badge);
+    badges.append(badge);
   } else if (flag === 'collectsData') {
     const badge = document.createElement('span');
     badge.className = 'badge-logs-data';
     badge.textContent = 'Logs data';
-    meta.append(badge);
+    badges.append(badge);
   }
 
-  row.append(cb, urlEl, meta);
+  mainLine.append(urlEl, badges);
+  content.append(mainLine);
+
+  // Additional metadata tags (version, registration, user count, provider, etc.)
+  if (inst.meta && Object.keys(inst.meta).length > 0) {
+    const tagsLine = document.createElement('div');
+    tagsLine.className = 'instance-meta-tags';
+    for (const [key, value] of Object.entries(inst.meta)) {
+      const tag = document.createElement('span');
+      tag.className = 'instance-meta-tag';
+      tag.textContent = `${key}: ${value}`;
+      tagsLine.append(tag);
+    }
+    content.append(tagsLine);
+  }
+
+  row.append(cb, content);
   // Clicking the row toggles the checkbox
   row.addEventListener('click', e => { if (e.target !== cb) cb.click(); });
 
@@ -547,6 +664,90 @@ function countryFlag(code) {
 
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Network-call confirmation modal (shown when auto-refresh is Off) ──────────
+
+/**
+ * Shows a modal warning the user that a manual refresh will make a network
+ * request to the given URL. Returns true if they confirm, false if they cancel.
+ *
+ * @param {string} serviceLabel - e.g. "YouTube"
+ * @param {string} fetchUrl     - the URL that will be fetched
+ * @returns {Promise<boolean>}
+ */
+function confirmNetworkFetch(serviceLabel, fetchUrl) {
+  return new Promise(resolve => {
+    let overlay = document.getElementById('network-fetch-modal-overlay');
+
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'network-fetch-modal-overlay';
+      overlay.className = 'modal-overlay';
+      overlay.setAttribute('hidden', '');
+
+      const box = document.createElement('div');
+      box.className = 'modal-box';
+
+      const icon = document.createElement('div');
+      icon.className = 'modal-icon';
+      icon.textContent = '🌐';
+
+      const title = document.createElement('div');
+      title.className = 'modal-title';
+      title.textContent = 'Network request required';
+
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+
+      const actions = document.createElement('div');
+      actions.className = 'modal-actions';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn-modal-cancel';
+      cancelBtn.textContent = 'Cancel';
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'btn-modal-confirm btn-modal-fetch';
+      confirmBtn.textContent = 'Fetch now';
+
+      actions.append(cancelBtn, confirmBtn);
+      box.append(icon, title, body, actions);
+      overlay.append(box);
+      document.body.append(overlay);
+    }
+
+    const body = overlay.querySelector('.modal-body');
+    const hostname = (() => { try { return new URL(fetchUrl).hostname; } catch { return fetchUrl; } })();
+
+    body.innerHTML =
+      `Refreshing the <strong>${escHtml(serviceLabel)}</strong> instance list requires a network request to:<br><br>` +
+      `<code class="fetch-url">${escHtml(fetchUrl)}</code><br><br>` +
+      `This request will reveal to <strong>${escHtml(hostname)}</strong> that you have ` +
+      `Switcheroo installed (your IP address and browser User-Agent will be visible). ` +
+      `No browsing history or redirect activity is included.<br><br>` +
+      `You can enable automatic updates in the <strong>Instance Lists</strong> section above ` +
+      `to avoid this prompt in the future.`;
+
+    overlay.removeAttribute('hidden');
+
+    const cancelBtn  = overlay.querySelector('.btn-modal-cancel');
+    const confirmBtn = overlay.querySelector('.btn-modal-fetch');
+
+    function finish(confirmed) {
+      overlay.setAttribute('hidden', '');
+      cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+      confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+      overlay.removeEventListener('click', onOverlayClick);
+      resolve(confirmed);
+    }
+
+    function onOverlayClick(e) { if (e.target === overlay) finish(false); }
+
+    overlay.querySelector('.btn-modal-cancel').addEventListener('click', () => finish(false));
+    overlay.querySelector('.btn-modal-fetch').addEventListener('click', () => finish(true));
+    overlay.addEventListener('click', onOverlayClick);
+  });
 }
 
 // ── Privacy-risk confirmation modal ───────────────────────────────────────────
@@ -645,9 +846,12 @@ function confirmPrivacyRisk(flag, instanceUrl) {
 async function init() {
   const container = document.getElementById('services-container');
 
-  let settings, allInstances;
+  let settings, globalSettings, allInstances;
   try {
-    settings = await sendMessage({ action: 'getSettings' });
+    [settings, globalSettings] = await Promise.all([
+      sendMessage({ action: 'getSettings' }),
+      sendMessage({ action: 'getGlobalSettings' }),
+    ]);
     allInstances = {};
     await Promise.all(Object.keys(SERVICE_META).map(async id => {
       allInstances[id] = await sendMessage({ action: 'getInstances', serviceId: id }) ?? [];
@@ -660,7 +864,10 @@ async function init() {
 
   container.innerHTML = '';
 
-  let order = 0;
+  // Global settings card always renders first
+  container.append(buildGlobalSection(globalSettings));
+
+  let order = 1; // service sections start at order-1 (global is order-0)
   for (const id of Object.keys(SERVICE_META)) {
     if (!settings[id]) continue;
     container.append(buildSection(id, settings, allInstances[id] ?? [], order++));

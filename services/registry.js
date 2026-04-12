@@ -11,6 +11,7 @@
  * @property {number}   [uptime]   - 0–100 uptime percentage
  * @property {boolean}  [cloudflare]   - true if behind Cloudflare
  * @property {boolean}  [collectsData] - true if the operator has indicated they log user data
+ * @property {Record<string,string>} [meta] - additional display metadata (version, provider, etc.)
  *
  * @typedef {object} ServiceSettings
  * @property {boolean}  enabled

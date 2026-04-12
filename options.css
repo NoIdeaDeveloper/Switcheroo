@@ -130,6 +130,7 @@ html, body {
   background: var(--peach); /* default */
 }
 
+.section--global::before      { background: var(--border); }
 .section--youtube::before     { background: #C97A52; }
 .section--reddit::before      { background: #72B898; }
 .section--googlefonts::before { background: #9E90CC; }
@@ -428,14 +429,58 @@ html, body {
 .instance-list::-webkit-scrollbar-track { background: transparent; }
 .instance-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+/* ── Global settings hint text ────────────────────────────────── */
+
+.global-setting-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-top: 6px;
+}
+
+/* ── Instance rows (restructured with content wrapper) ───────── */
+
 .instance-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 11px;
   padding: 9px 13px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.12s;
+}
+
+.instance-row-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.instance-row-main {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+/* ── Instance meta tags ───────────────────────────────────────── */
+
+.instance-meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.instance-meta-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 7px;
+  white-space: nowrap;
 }
 
 .instance-row:last-child { border-bottom: none; }
@@ -449,6 +494,7 @@ html, body {
   accent-color: var(--peach-dk);
   flex-shrink: 0;
   cursor: pointer;
+  margin-top: 2px; /* align with first text line when meta tags push row height */
 }
 
 .instance-url {
@@ -721,6 +767,27 @@ code {
 }
 
 .btn-modal-confirm:hover { background: #A03A3A; }
+
+/* Fetch-now variant — blue, not red, since it's informational not destructive */
+.btn-modal-fetch {
+  background: var(--lavender);
+  color: var(--text);
+}
+.btn-modal-fetch:hover { background: #8070B8; color: #fff; }
+
+/* Inline code block inside modal body */
+.fetch-url {
+  display: block;
+  word-break: break-all;
+  font-size: 11.5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text-mid);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  line-height: 1.55;
+}
 
 @keyframes fadeIn {
   from { opacity: 0; }

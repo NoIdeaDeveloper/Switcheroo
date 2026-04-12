@@ -19,11 +19,14 @@
 import { getAll, getById } from './services/registry.js';
 import {
   initializeDefaults,
+  initializeGlobalDefaults,
   getSettings,
   getServiceSettings,
   setServiceSettings,
   getCachedInstances,
   isCacheStale,
+  getGlobalSettings,
+  setGlobalSettings,
 } from './utils/storage.js';
 import {
   getCachedOrFetchInstances,
@@ -94,6 +97,7 @@ function registerAlarm() {
 async function fullInit(extensionId) {
   const services = getAll();
   await initializeDefaults(services);
+  await initializeGlobalDefaults();
 
   // Fetch (or load fallback) for all services in parallel.
   // getCachedOrFetchInstances handles the fallback path and caches the result.
@@ -112,10 +116,14 @@ async function lightStartup(extensionId) {
   await rotateAllInstances(extensionId);
   registerAlarm();
 
-  // Then asynchronously refresh any stale caches
+  // Then asynchronously refresh any stale caches — unless auto-refresh is Off
+  const { instanceRefreshIntervalMs } = await getGlobalSettings();
+  if (instanceRefreshIntervalMs === null) return;
+
   const services = getAll();
   for (const service of services) {
-    const stale = await isCacheStale(service.id, service.instanceFetcher.cacheTTLMs);
+    if (!service.instanceFetcher.url) continue;
+    const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
     if (stale) {
       fetchInstances(service).catch(() => {}); // fire-and-forget; alarm will retry
     }
@@ -149,16 +157,18 @@ chrome.alarms.onAlarm.addListener(async alarm => {
   const extensionId = chrome.runtime.id;
   const now = Date.now();
 
-  // Fetch fresh instance data only when the cache is actually stale.
-  // This keeps upstream API calls at ~hourly even though the alarm fires every minute.
-  await Promise.all(
-    services
-      .filter(s => s.instanceFetcher.url)
-      .map(async service => {
-        const stale = await isCacheStale(service.id, service.instanceFetcher.cacheTTLMs);
-        if (stale) await fetchInstances(service).catch(() => {});
-      })
-  );
+  // Fetch fresh instance data only when auto-refresh is enabled and the cache is stale.
+  const { instanceRefreshIntervalMs } = await getGlobalSettings();
+  if (instanceRefreshIntervalMs !== null) {
+    await Promise.all(
+      services
+        .filter(s => s.instanceFetcher.url)
+        .map(async service => {
+          const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
+          if (stale) await fetchInstances(service).catch(() => {});
+        })
+    );
+  }
 
   // Rotate only random-mode services whose configured interval has elapsed.
   // Services set to 'startup only' (rotationIntervalMs === 0) are skipped here
@@ -234,6 +244,14 @@ async function handleMessage(message) {
   switch (message.action) {
     case 'getSettings':
       return getSettings();
+
+    case 'getGlobalSettings':
+      return getGlobalSettings();
+
+    case 'setGlobalSettings': {
+      await setGlobalSettings(message.settings);
+      return { ok: true };
+    }
 
     case 'setServiceSettings': {
       const { serviceId, settings } = message;
