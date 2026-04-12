@@ -1,0 +1,6 @@
+[
+  { "url": "https://redlib.catsarch.com",     "country": "US", "cloudflare": false },
+  { "url": "https://red.artemislena.eu",      "country": "DE", "cloudflare": false },
+  { "url": "https://redlib.nadeko.net",       "country": "CL", "cloudflare": false },
+  { "url": "https://redlib.privadency.com",   "country": "DE", "cloudflare": false }
+]

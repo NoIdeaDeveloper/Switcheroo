@@ -1,0 +1,7 @@
+[
+  { "url": "https://inv.nadeko.net",          "country": "CL", "uptime": 99.9,   "cloudflare": false },
+  { "url": "https://invidious.nerdvpn.de",    "country": "UA", "uptime": 99.9,   "cloudflare": false },
+  { "url": "https://yewtu.be",                "country": "DE", "uptime": 99.7,   "cloudflare": false },
+  { "url": "https://inv.thepixora.com",       "country": "CA", "uptime": 98.6,   "cloudflare": false },
+  { "url": "https://yt.chocolatemoo53.com",   "country": "US", "uptime": 87.8,   "cloudflare": false }
+]

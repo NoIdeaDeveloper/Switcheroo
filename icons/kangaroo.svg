@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="64" fill="#F5E6C8"/>
+
+  <!-- Body -->
+  <ellipse cx="62" cy="80" rx="24" ry="28" fill="#E8A87C"/>
+
+  <!-- Tail -->
+  <path d="M38 96 Q18 110 22 122 Q30 118 40 108 Z" fill="#D48B5A"/>
+
+  <!-- Back leg -->
+  <path d="M52 100 Q42 114 48 126 Q58 120 58 106 Z" fill="#D48B5A"/>
+
+  <!-- Front leg / arm -->
+  <path d="M66 78 Q80 72 84 62 Q74 60 66 70 Z" fill="#D48B5A"/>
+
+  <!-- Pouch -->
+  <ellipse cx="60" cy="88" rx="12" ry="10" fill="#D48B5A" opacity="0.6"/>
+
+  <!-- Head -->
+  <ellipse cx="74" cy="48" rx="18" ry="16" fill="#E8A87C"/>
+
+  <!-- Ear left -->
+  <ellipse cx="64" cy="33" rx="6" ry="9" fill="#E8A87C"/>
+  <ellipse cx="64" cy="33" rx="3.5" ry="6" fill="#F5B8A0"/>
+
+  <!-- Ear right -->
+  <ellipse cx="80" cy="31" rx="5" ry="8" fill="#E8A87C"/>
+  <ellipse cx="80" cy="31" rx="3" ry="5" fill="#F5B8A0"/>
+
+  <!-- Eye -->
+  <circle cx="80" cy="46" r="4" fill="#8B5E3C"/>
+  <circle cx="81" cy="45" r="1.5" fill="white"/>
+
+  <!-- Nose -->
+  <ellipse cx="87" cy="52" rx="3.5" ry="2.5" fill="#8B5E3C"/>
+
+  <!-- Smile -->
+  <path d="M83 55 Q87 58 90 55" stroke="#8B5E3C" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Small joey peeking from pouch -->
+  <circle cx="60" cy="84" r="6" fill="#F5B8A0"/>
+  <circle cx="63" cy="83" r="1.5" fill="#8B5E3C"/>
+  <ellipse cx="57" cy="79" rx="2.5" ry="3.5" fill="#F5B8A0"/>
+  <ellipse cx="62" cy="78" rx="2" ry="3" fill="#F5B8A0"/>
+</svg>

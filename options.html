@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Switcheroo Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <!-- ── Page header ──────────────────────────────────── -->
+  <header class="page-header">
+    <div class="page-header-inner">
+      <img src="icons/icon48.png" alt="Switcheroo" class="page-icon" width="40" height="40">
+      <div>
+        <h1 class="page-title">Switcheroo Settings</h1>
+        <p class="page-subtitle">Your Privacy Pal</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <!-- ── Service sections (populated by options.js) ── -->
+    <div id="services-container">
+      <div class="loading">Loading settings…</div>
+    </div>
+
+    <!-- ── Privacy section ──────────────────────────── -->
+    <section class="section privacy-section" id="privacy">
+      <h2 class="section-title">Privacy &amp; Transparency</h2>
+      <div class="privacy-body">
+        <p>
+          Switcheroo is built with your privacy as the top priority. Here's
+          exactly what this extension does and doesn't do:
+        </p>
+        <ul>
+          <li>
+            <strong>No browsing data collected.</strong> Switcheroo uses the
+            browser's Declarative Net Request API, which handles redirects at
+            the browser level. The extension code never sees which YouTube
+            videos or Reddit posts you visit.
+          </li>
+          <li>
+            <strong>No analytics or telemetry.</strong> Zero usage data is
+            collected or transmitted.
+          </li>
+          <li>
+            <strong>Local storage only.</strong> Your settings are stored in
+            <code>chrome.storage.local</code> — not synced to any server,
+            not uploaded to Google.
+          </li>
+          <li>
+            <strong>Two network requests are made</strong> to fetch up-to-date
+            instance lists (at install time and every hour). These requests go
+            to:
+            <ul class="sub-list">
+              <li><code>https://api.invidious.io/instances.json</code></li>
+              <li><code>https://raw.githubusercontent.com/redlib-org/…/instances.json</code></li>
+            </ul>
+            These requests contain no user data beyond a standard browser
+            request (IP address, User-Agent). They inform the servers that you
+            have Switcheroo installed. If you prefer not to make these requests,
+            you can rely solely on the bundled fallback instance lists.
+          </li>
+          <li>
+            <strong>Cloudflare instances excluded by default.</strong> Cloudflare
+            acts as a middleman that can log traffic, defeating the purpose of
+            a privacy frontend. Cloudflare-backed instances are shown separately
+            and disabled by default.
+          </li>
+          <li>
+            <strong>HTTPS only.</strong> Only HTTPS instances are ever used as
+            redirect targets. HTTP instances are rejected automatically.
+          </li>
+        </ul>
+        <p class="source-link">
+          Switcheroo is open source.
+          <a href="https://github.com/jeffgoldblum/switcheroo" target="_blank" rel="noopener noreferrer">
+            View source on GitHub ↗
+          </a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>
