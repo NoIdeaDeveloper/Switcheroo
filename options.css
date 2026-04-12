@@ -135,6 +135,7 @@ html, body {
 .section--googlefonts::before { background: #9E90CC; }
 .section--imgur::before       { background: #5B8FBF; }
 .section--tiktok::before      { background: #B87090; }
+.section--scribe::before      { background: #7BAA72; }
 
 /* Animation stagger — driven by order class set in JS */
 .section--order-0 { animation-delay: 0s;     }
@@ -143,6 +144,7 @@ html, body {
 .section--order-3 { animation-delay: 0.21s;  }
 .section--order-4 { animation-delay: 0.28s;  }
 .section--order-5 { animation-delay: 0.35s;  }
+.section--order-6 { animation-delay: 0.42s;  }
 
 .section-header {
   padding: 18px 22px 18px 26px;
@@ -158,6 +160,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
+  transition: opacity 0.3s ease;
 }
 
 .section-title {
@@ -179,11 +182,33 @@ html, body {
   color: var(--text-mid);
 }
 
+/* Collapsible body wrapper — animates open/closed when the section toggle changes */
+.section-body-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.section--collapsed .section-body-wrap {
+  grid-template-rows: 0fr;
+}
+
+/* The section-body must have min-height:0 for the grid-row collapse to work */
+.section-body-wrap > .section-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .section-body {
   padding: 22px 22px 22px 26px;
   display: flex;
   flex-direction: column;
   gap: 22px;
+}
+
+/* Dim the title row when the section is collapsed (service disabled) */
+.section--collapsed .section-title-row {
+  opacity: 0.45;
 }
 
 /* ── Toggle (shared) ──────────────────────────────────────────── */
@@ -470,8 +495,22 @@ html, body {
   padding: 1px 6px;
 }
 
-/* CF section divider */
-.cf-divider {
+.badge-logs-data {
+  font-size: 10px;
+  font-weight: 700;
+  background: #F0D8D8;
+  color: var(--error);
+  border: 1px solid #DBA8A8;
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.instance-row.logs-data-row { background: #F5ECEC; }
+.instance-row.logs-data-row:hover { background: #EFE0E0; }
+
+/* Section dividers (Cloudflare / logs-data) */
+.cf-divider,
+.logs-data-divider {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -591,4 +630,99 @@ code {
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Privacy-risk confirmation modal ──────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(39, 22, 8, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.15s ease both;
+}
+
+.modal-overlay[hidden] { display: none; }
+
+.modal-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: 0 8px 40px rgba(39,22,8,0.22);
+  padding: 28px 28px 22px;
+  max-width: 420px;
+  width: calc(100% - 48px);
+  animation: fadeUp 0.18s ease both;
+}
+
+.modal-icon {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 10px;
+  letter-spacing: -0.3px;
+}
+
+.modal-body {
+  font-size: 14px;
+  color: var(--text-mid);
+  line-height: 1.65;
+  margin-bottom: 22px;
+}
+
+.modal-instance {
+  display: inline-block;
+  font-weight: 700;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn-modal-cancel {
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-modal-cancel:hover { border-color: var(--peach); color: var(--text); }
+
+.btn-modal-confirm {
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: none;
+  background: var(--error);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-modal-confirm:hover { background: #A03A3A; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }

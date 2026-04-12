@@ -47,10 +47,9 @@ export const imgurService = {
         .map(inst => ({
           url: inst.url.replace(/\/$/, ''),
           country: inst.country ?? undefined,
-          uptime: undefined, // rimgo instances.json does not expose uptime
-          // Flag instances that note data collection as cloudflare (privacy-reduced)
-          // so users can opt them out via allowCloudflare setting.
-          cloudflare: typeof inst.note === 'string' && inst.note.includes('Data collected'),
+          uptime: undefined,   // rimgo instances.json does not expose uptime
+          cloudflare: false,
+          collectsData: typeof inst.note === 'string' && inst.note.includes('Data collected'),
         }));
     },
 

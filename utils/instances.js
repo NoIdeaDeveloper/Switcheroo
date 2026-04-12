@@ -8,6 +8,7 @@
  *   - https://raw.githubusercontent.com/redlib-org/redlib-instances/…/instances.json
  * These requests reveal that the user has the extension installed, but contain
  * no user-identifiable browsing data. This is disclosed in the options page.
+ * A fourth fetch goes to git.sr.ht for the Scribe (Medium) instance list.
  */
 
 import { sanitizeInstanceList } from './validate.js';
@@ -34,7 +35,9 @@ export async function fetchInstances(service) {
       return null;
     }
 
-    const raw = await response.json();
+    const raw = service.instanceFetcher.responseType === 'text'
+      ? await response.text()
+      : await response.json();
     const parsed = service.instanceFetcher.parse(raw);
     const validated = sanitizeInstanceList(parsed, service.sourceHosts);
 
@@ -111,9 +114,10 @@ export async function loadFallback(service) {
 export function getActiveInstances(allInstances, settings) {
   let pool = allInstances;
 
-  // Filter by Cloudflare preference
+  // Filter out privacy-reduced instances (Cloudflare-proxied or operator-declared
+  // data collection) unless the user has explicitly opted in.
   if (!settings.allowCloudflare) {
-    pool = pool.filter(inst => !inst.cloudflare);
+    pool = pool.filter(inst => !inst.cloudflare && !inst.collectsData);
   }
 
   // Filter by user's enabled-instance list (opt-out: empty = all)

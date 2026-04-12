@@ -24,6 +24,7 @@ const SERVICE_META = {
   },
   imgur:  { label: 'Imgur',   target: 'Rimgo'    },
   tiktok: { label: 'TikTok', target: 'ProxiTok' },
+  scribe: { label: 'Medium', target: 'Scribe'   },
 };
 
 function debounce(fn, ms) {
@@ -43,7 +44,7 @@ function buildSection(serviceId, settings, instances, order = 0) {
   const svc  = settings[serviceId] ?? {};
 
   const section = document.createElement('section');
-  section.className = `section section--${serviceId} section--order-${order}`;
+  section.className = `section section--${serviceId} section--order-${order}${svc.enabled === false ? ' section--collapsed' : ''}`;
   section.id = `section-${serviceId}`;
 
   // Header
@@ -62,7 +63,10 @@ function buildSection(serviceId, settings, instances, order = 0) {
   header.append(titleRow, toggle);
   section.append(header);
 
-  // Body
+  // Collapsible body wrapper — grid-row trick animates height without JS snapshots
+  const bodyWrap = document.createElement('div');
+  bodyWrap.className = 'section-body-wrap';
+
   const body = document.createElement('div');
   body.className = 'section-body';
 
@@ -102,7 +106,8 @@ function buildSection(serviceId, settings, instances, order = 0) {
     );
   }
 
-  section.append(body);
+  bodyWrap.append(body);
+  section.append(bodyWrap);
   return section;
 }
 
@@ -123,7 +128,11 @@ function buildToggle(serviceId, checked) {
   const thumb = document.createElement('span');
   thumb.className = 'toggle-thumb';
 
-  input.addEventListener('change', () => debouncedSave(serviceId, { enabled: input.checked }));
+  input.addEventListener('change', () => {
+    const section = input.closest('.section');
+    section?.classList.toggle('section--collapsed', !input.checked);
+    debouncedSave(serviceId, { enabled: input.checked });
+  });
   lbl.append(input, track, thumb);
   return lbl;
 }
@@ -188,10 +197,11 @@ function buildFixedPicker(serviceId, svc, instances) {
   const placeholder = new Option('— Select an instance —', '');
   select.append(placeholder);
 
-  const nonCF = instances.filter(i => !i.cloudflare);
-  const cfList = instances.filter(i => i.cloudflare);
+  const clean    = instances.filter(i => !i.cloudflare && !i.collectsData);
+  const cfList   = instances.filter(i => i.cloudflare);
+  const logsList = instances.filter(i => i.collectsData && !i.cloudflare);
 
-  for (const inst of nonCF) {
+  for (const inst of clean) {
     const opt = new Option(formatOpt(inst), inst.url);
     if (svc.fixedInstance === inst.url) opt.selected = true;
     select.append(opt);
@@ -201,6 +211,17 @@ function buildFixedPicker(serviceId, svc, instances) {
     const grp = document.createElement('optgroup');
     grp.label = '⚠ Cloudflare instances';
     for (const inst of cfList) {
+      const opt = new Option(`⚠ ${formatOpt(inst)}`, inst.url);
+      if (svc.fixedInstance === inst.url) opt.selected = true;
+      grp.append(opt);
+    }
+    select.append(grp);
+  }
+
+  if (logsList.length) {
+    const grp = document.createElement('optgroup');
+    grp.label = '⚠ Instances that collect your data';
+    for (const inst of logsList) {
       const opt = new Option(`⚠ ${formatOpt(inst)}`, inst.url);
       if (svc.fixedInstance === inst.url) opt.selected = true;
       grp.append(opt);
@@ -362,22 +383,25 @@ function buildInstanceRows(serviceId, svc, instances) {
     return list;
   }
 
-  const nonCF = instances.filter(i => !i.cloudflare);
-  const cfList = instances.filter(i => i.cloudflare);
+  const clean       = instances.filter(i => !i.cloudflare && !i.collectsData);
+  const cfList      = instances.filter(i => i.cloudflare);
+  const logsList    = instances.filter(i => i.collectsData && !i.cloudflare);
 
-  for (const inst of nonCF) list.append(buildRow(serviceId, svc, inst, false));
+  for (const inst of clean) list.append(buildRow(serviceId, svc, inst, null));
 
   if (cfList.length) {
-    const divider = document.createElement('div');
-    divider.className = 'cf-divider';
-    divider.textContent = '⚠ Cloudflare instances — may log your traffic';
-    list.append(divider);
-    for (const inst of cfList) list.append(buildRow(serviceId, svc, inst, true));
+    list.append(makeDivider('cf-divider', '⚠ Cloudflare instances — may log your traffic'));
+    for (const inst of cfList) list.append(buildRow(serviceId, svc, inst, 'cloudflare'));
   }
 
-  // Warn if nothing is enabled (and non-CF list is non-empty)
-  const checkedCount = nonCF.filter(i => isEnabled(i, svc)).length;
-  if (checkedCount === 0 && nonCF.length > 0) {
+  if (logsList.length) {
+    list.append(makeDivider('logs-data-divider', '⚠ These instances have indicated they collect your data — use with caution'));
+    for (const inst of logsList) list.append(buildRow(serviceId, svc, inst, 'collectsData'));
+  }
+
+  // Warn if nothing is enabled (and clean list is non-empty)
+  const checkedCount = clean.filter(i => isEnabled(i, svc)).length;
+  if (checkedCount === 0 && clean.length > 0) {
     const warn = document.createElement('div');
     warn.className = 'warn-no-selection';
     warn.textContent = '⚠ No instances selected — all instances will be used as fallback.';
@@ -387,15 +411,46 @@ function buildInstanceRows(serviceId, svc, instances) {
   return list;
 }
 
-function buildRow(serviceId, svc, inst, isCF) {
+function makeDivider(className, text) {
+  const el = document.createElement('div');
+  el.className = className;
+  el.textContent = text;
+  return el;
+}
+
+function buildRow(serviceId, svc, inst, flag) {
+  const rowClass = flag === 'cloudflare'    ? ' cf-row'
+                 : flag === 'collectsData'  ? ' logs-data-row'
+                 : '';
   const row = document.createElement('div');
-  row.className = `instance-row${isCF ? ' cf-row' : ''}`;
+  row.className = `instance-row${rowClass}`;
 
   const cb = document.createElement('input');
   cb.type = 'checkbox';
   cb.className = 'instance-check';
   cb.checked = isEnabled(inst, svc);
-  cb.addEventListener('change', () => updateEnabled(serviceId, inst.url, cb.checked));
+
+  if (flag === 'cloudflare' || flag === 'collectsData') {
+    // Privacy-risk instances: show a confirmation modal before enabling.
+    // Disabling is always immediate — no confirmation needed.
+    cb.addEventListener('change', async () => {
+      if (!cb.checked) {
+        updateEnabled(serviceId, inst.url, false);
+        return;
+      }
+      cb.checked = false; // optimistically uncheck while modal is open
+      const confirmed = await confirmPrivacyRisk(flag, inst.url);
+      if (confirmed) {
+        cb.checked = true;
+        updateEnabled(serviceId, inst.url, true);
+        // Also turn on allowCloudflare so the instance actually gets used in random mode
+        sendMessage({ action: 'setServiceSettings', serviceId, settings: { allowCloudflare: true } })
+          .catch(console.error);
+      }
+    });
+  } else {
+    cb.addEventListener('change', () => updateEnabled(serviceId, inst.url, cb.checked));
+  }
 
   const urlEl = document.createElement('span');
   urlEl.className = 'instance-url';
@@ -406,11 +461,11 @@ function buildRow(serviceId, svc, inst, isCF) {
   meta.className = 'instance-meta';
 
   if (inst.country) {
-    const flag = document.createElement('span');
-    flag.className = 'instance-flag';
-    flag.textContent = countryFlag(inst.country);
-    flag.title = inst.country;
-    meta.append(flag);
+    const flagEl = document.createElement('span');
+    flagEl.className = 'instance-flag';
+    flagEl.textContent = countryFlag(inst.country);
+    flagEl.title = inst.country;
+    meta.append(flagEl);
   }
 
   if (typeof inst.uptime === 'number') {
@@ -420,10 +475,15 @@ function buildRow(serviceId, svc, inst, isCF) {
     meta.append(up);
   }
 
-  if (isCF) {
+  if (flag === 'cloudflare') {
     const badge = document.createElement('span');
     badge.className = 'badge-cf';
     badge.textContent = 'CF';
+    meta.append(badge);
+  } else if (flag === 'collectsData') {
+    const badge = document.createElement('span');
+    badge.className = 'badge-logs-data';
+    badge.textContent = 'Logs data';
     meta.append(badge);
   }
 
@@ -462,6 +522,12 @@ async function updateEnabled(serviceId, url, enabled) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isEnabled(inst, svc) {
+  // CF and data-collecting instances are always opt-in: they must be
+  // explicitly present in enabledInstances before the checkbox is shown
+  // as checked. The opt-out "empty = all enabled" model does not apply to them.
+  if (inst.cloudflare || inst.collectsData) {
+    return svc.enabledInstances?.includes(inst.url) ?? false;
+  }
   if (!svc.enabledInstances?.length) return true;
   return svc.enabledInstances.includes(inst.url);
 }
@@ -481,6 +547,97 @@ function countryFlag(code) {
 
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Privacy-risk confirmation modal ───────────────────────────────────────────
+
+/**
+ * Shows a confirmation modal when the user tries to enable a privacy-reduced
+ * instance (Cloudflare-proxied or data-collecting).
+ *
+ * Returns a Promise that resolves to true (confirmed) or false (cancelled).
+ *
+ * @param {'cloudflare'|'collectsData'} flag
+ * @param {string} instanceUrl
+ * @returns {Promise<boolean>}
+ */
+function confirmPrivacyRisk(flag, instanceUrl) {
+  return new Promise(resolve => {
+    let overlay = document.getElementById('privacy-modal-overlay');
+
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'privacy-modal-overlay';
+      overlay.className = 'modal-overlay';
+      overlay.setAttribute('hidden', '');
+
+      const box = document.createElement('div');
+      box.className = 'modal-box';
+
+      const icon  = document.createElement('div');
+      icon.className = 'modal-icon';
+      icon.textContent = '⚠';
+
+      const title = document.createElement('div');
+      title.className = 'modal-title';
+
+      const body  = document.createElement('div');
+      body.className = 'modal-body';
+
+      const actions = document.createElement('div');
+      actions.className = 'modal-actions';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn-modal-cancel';
+      cancelBtn.textContent = 'Cancel';
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'btn-modal-confirm';
+      confirmBtn.textContent = 'Enable anyway';
+
+      actions.append(cancelBtn, confirmBtn);
+      box.append(icon, title, body, actions);
+      overlay.append(box);
+      document.body.append(overlay);
+    }
+
+    const title = overlay.querySelector('.modal-title');
+    const body  = overlay.querySelector('.modal-body');
+
+    if (flag === 'cloudflare') {
+      title.textContent = 'Cloudflare-proxied instance';
+      body.innerHTML =
+        `This instance routes your traffic through Cloudflare, which can log your IP address and the pages you visit.<br><br>` +
+        `Instance: <span class="modal-instance">${escHtml(instanceUrl.replace('https://', ''))}</span>`;
+    } else {
+      title.textContent = 'Instance collects your data';
+      body.innerHTML =
+        `This instance has indicated that it <strong>collects user data</strong>. Enabling it means your Medium redirects may be logged by the instance operator.<br><br>` +
+        `Instance: <span class="modal-instance">${escHtml(instanceUrl.replace('https://', ''))}</span>`;
+    }
+
+    overlay.removeAttribute('hidden');
+
+    const cancelBtn  = overlay.querySelector('.btn-modal-cancel');
+    const confirmBtn = overlay.querySelector('.btn-modal-confirm');
+
+    function finish(confirmed) {
+      overlay.setAttribute('hidden', '');
+      cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+      confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+      // Dismiss on overlay click
+      overlay.removeEventListener('click', onOverlayClick);
+      resolve(confirmed);
+    }
+
+    function onOverlayClick(e) {
+      if (e.target === overlay) finish(false);
+    }
+
+    overlay.querySelector('.btn-modal-cancel').addEventListener('click', () => finish(false));
+    overlay.querySelector('.btn-modal-confirm').addEventListener('click', () => finish(true));
+    overlay.addEventListener('click', onOverlayClick);
+  });
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────

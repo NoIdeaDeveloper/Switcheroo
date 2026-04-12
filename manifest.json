@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Switcheroo",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Redirect YouTube and Reddit to privacy-friendly frontends.",
   "permissions": [
     "declarativeNetRequest",
@@ -11,7 +11,8 @@
   "host_permissions": [
     "https://api.invidious.io/*",
     "https://raw.githubusercontent.com/*",
-    "https://rimgo.codeberg.page/*"
+    "https://rimgo.codeberg.page/*",
+    "https://git.sr.ht/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -35,6 +36,6 @@
     "128": "icons/icon128.png"
   },
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; script-src 'self'; connect-src https://api.invidious.io https://raw.githubusercontent.com https://rimgo.codeberg.page"
+    "extension_pages": "default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; script-src 'self'; connect-src https://api.invidious.io https://raw.githubusercontent.com https://rimgo.codeberg.page https://git.sr.ht"
   }
 }

@@ -9,7 +9,8 @@
  * @property {string}   url        - HTTPS base URL, no trailing slash
  * @property {string}   [country]  - ISO 2-letter country code
  * @property {number}   [uptime]   - 0–100 uptime percentage
- * @property {boolean}  [cloudflare] - true if behind Cloudflare
+ * @property {boolean}  [cloudflare]   - true if behind Cloudflare
+ * @property {boolean}  [collectsData] - true if the operator has indicated they log user data
  *
  * @typedef {object} ServiceSettings
  * @property {boolean}  enabled
@@ -36,6 +37,7 @@ import { redditService } from './reddit.js';
 import { googleFontsService } from './googlefonts.js';
 import { imgurService } from './imgur.js';
 import { tiktokService } from './tiktok.js';
+import { scribeService } from './scribe.js';
 
 const SERVICES = [
   youtubeService,
@@ -43,6 +45,7 @@ const SERVICES = [
   googleFontsService,
   imgurService,
   tiktokService,
+  scribeService,
 ];
 
 /**

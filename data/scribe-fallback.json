@@ -1,0 +1,13 @@
+[
+  { "url": "https://scribe.rip",                    "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.nixnet.services",         "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.citizen4.eu",             "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.bus-hit.me",              "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.froth.zone",              "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.privacydev.net",          "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.rawbit.ninja",            "cloudflare": false, "collectsData": false },
+  { "url": "https://m.opnxng.com",                   "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.manasiwibi.com",          "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.r4fo.com",                "cloudflare": false, "collectsData": false },
+  { "url": "https://scribe.privacyredirect.com",     "cloudflare": false, "collectsData": false }
+]

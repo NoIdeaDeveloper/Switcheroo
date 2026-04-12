@@ -19,6 +19,7 @@ const SERVICE_META = {
   googlefonts: { label: 'Google Fonts', target: 'Bunny Fonts', accentColor: '#C9B8F0', staticRedirect: true },
   imgur:       { label: 'Imgur',   target: 'Rimgo',    accentColor: '#8EC0E8' },
   tiktok:      { label: 'TikTok', target: 'ProxiTok', accentColor: '#D9A0BC' },
+  scribe:      { label: 'Medium', target: 'Scribe',   accentColor: '#AACCA4' },
 };
 
 // ─── Card rendering ───────────────────────────────────────────────────────────
@@ -143,7 +144,9 @@ function escHtml(s) {
 
 function countActive(instances, settings) {
   if (!instances?.length) return 0;
-  let pool = settings.allowCloudflare ? instances : instances.filter(i => !i.cloudflare);
+  let pool = settings.allowCloudflare
+    ? instances
+    : instances.filter(i => !i.cloudflare && !i.collectsData);
   if (settings.enabledInstances?.length > 0) {
     const enabled = new Set(settings.enabledInstances);
     pool = pool.filter(i => enabled.has(i.url));
@@ -180,10 +183,27 @@ async function init() {
 
   for (const id of Object.keys(SERVICE_META)) {
     if (!settings[id]) continue;
+    if (!settings[id].enabled) continue; // disabled services are hidden from the popup
     container.append(buildCard(id, settings[id], allInstances[id] ?? []));
   }
 
   attachListeners(settings);
+}
+
+/**
+ * Animates a card element to height 0 then removes it from the DOM.
+ * Uses a forced-reflow trick so the transition fires correctly.
+ * @param {HTMLElement} card
+ */
+function animateCardOut(card) {
+  card.style.height = card.offsetHeight + 'px';
+  card.style.overflow = 'hidden';
+  // Reading offsetHeight forces layout, committing the initial height before transition starts
+  card.offsetHeight; // eslint-disable-line no-unused-expressions
+  card.style.transition = 'height 0.28s ease, opacity 0.22s ease';
+  card.style.height = '0';
+  card.style.opacity = '0';
+  setTimeout(() => card.remove(), 300);
 }
 
 function attachListeners(settings) {
@@ -193,21 +213,18 @@ function attachListeners(settings) {
       const id = input.dataset.serviceId;
       const enabled = input.checked;
 
-      const card = document.querySelector(`.card[data-service-id="${id}"]`);
-      if (card) {
-        card.classList.toggle('disabled', !enabled);
-        const accent = card.querySelector('.card-accent');
-        if (accent) accent.style.background = enabled ? SERVICE_META[id]?.accentColor : '#E8D8CE';
-        const dot = card.querySelector('.status-dot');
-        if (dot) dot.classList.toggle('off', !enabled);
+      if (!enabled) {
+        // Optimistically animate the card out immediately for snappy feel
+        const card = document.querySelector(`.card[data-service-id="${id}"]`);
+        if (card) animateCardOut(card);
       }
 
       try {
         await sendMessage({ action: 'setServiceSettings', serviceId: id, settings: { enabled } });
-        const freshSettings = await sendMessage({ action: 'getSettings' });
-        rerenderCard(id, freshSettings[id], _instancesCache[id] ?? []);
       } catch {
-        input.checked = !enabled;
+        // Save failed — restore the full popup state
+        if (!enabled) await init();
+        else input.checked = false;
       }
     });
   });
@@ -241,32 +258,5 @@ function attachListeners(settings) {
   });
 }
 
-function rerenderCard(serviceId, newSettings, instances) {
-  const old = document.querySelector(`.card[data-service-id="${serviceId}"]`);
-  if (!old) return;
-  const fresh = buildCard(serviceId, newSettings, instances);
-  old.replaceWith(fresh);
-
-  // Re-attach listeners for the new card
-  fresh.querySelector('.toggle input')?.addEventListener('change', async (e) => {
-    const id = e.target.dataset.serviceId;
-    const enabled = e.target.checked;
-    const card = document.querySelector(`.card[data-service-id="${id}"]`);
-    if (card) {
-      card.classList.toggle('disabled', !enabled);
-      const accent = card.querySelector('.card-accent');
-      if (accent) accent.style.background = enabled ? SERVICE_META[id]?.accentColor : '#E8D8CE';
-    }
-    try {
-      await sendMessage({ action: 'setServiceSettings', serviceId: id, settings: { enabled } });
-      const freshSettings = await sendMessage({ action: 'getSettings' });
-      rerenderCard(id, freshSettings[id], _instancesCache[id] ?? []);
-    } catch { e.target.checked = !enabled; }
-  });
-  fresh.querySelector('.settings-link')?.addEventListener('click', () => {
-    chrome.storage.local.set({ optionsScrollTo: serviceId });
-    chrome.runtime.openOptionsPage();
-  });
-}
 
 init();
