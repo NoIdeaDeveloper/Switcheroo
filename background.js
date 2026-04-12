@@ -28,7 +28,6 @@ import {
 import {
   getCachedOrFetchInstances,
   fetchInstances,
-  loadFallback,
   resolveCurrentInstance,
 } from './utils/instances.js';
 import { rebuildAllRules, applyRulesForService } from './utils/dnr.js';
@@ -220,13 +219,16 @@ async function handleMessage(message) {
       // Merge the patch with the current settings first, then resolve the new
       // currentInstance — all in one atomic write so storage.onChanged fires
       // exactly once with the final, consistent state.
-      const current = await getServiceSettings(serviceId);
+      // Parallelise the two independent storage reads.
+      const [current, instances] = await Promise.all([
+        getServiceSettings(serviceId),
+        getCachedInstances(serviceId),
+      ]);
       const merged = { ...current, ...settings };
 
       if (merged.mode === 'fixed' && merged.fixedInstance) {
         merged.currentInstance = merged.fixedInstance;
       } else if (merged.mode === 'random') {
-        const instances = await getCachedInstances(serviceId);
         merged.currentInstance = resolveCurrentInstance(service, merged, instances);
       }
 

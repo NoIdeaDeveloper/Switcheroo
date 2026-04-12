@@ -1,17 +1,18 @@
 # 🦘 Switcheroo
 
-A privacy-focused browser extension for Brave (and Chromium-based browsers) that automatically redirects YouTube and Reddit to open-source, privacy-friendly frontends — with no tracking, no ads, and no data collection.
+A privacy-focused browser extension for Brave (and Chromium-based browsers) that automatically redirects privacy-invasive services to open-source, privacy-friendly frontends — with no tracking, no ads, and no data collection.
 
 | Service | Redirects to |
 |---------|-------------|
 | YouTube + youtu.be | [Invidious](https://invidious.io) |
 | Reddit + old.reddit.com | [Redlib](https://github.com/redlib-org/redlib) |
+| Google Fonts | [Bunny Fonts](https://fonts.bunny.net) |
 
 ---
 
 ## What it does
 
-When you click a YouTube or Reddit link — from a search result, another site, or your bookmarks — Switcheroo silently redirects you to an equivalent page on a privacy-respecting frontend before the original site ever loads. The redirect is handled at the browser level using the [Declarative Net Request](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest) API, so YouTube and Reddit never receive your request.
+When you click a YouTube or Reddit link — from a search result, another site, or your bookmarks — Switcheroo silently redirects you to an equivalent page on a privacy-respecting frontend before the original site ever loads. The redirect is handled at the browser level using the [Declarative Net Request](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest) API, so the original service never receives your request.
 
 **YouTube redirects handle:**
 - Watch pages (`/watch?v=`)
@@ -27,8 +28,16 @@ When you click a YouTube or Reddit link — from a search result, another site, 
 - Post pages
 - User profiles
 - Search
-- Homepage
+- Homepage (including with query parameters like `?sort=hot`)
 - `old.reddit.com`
+
+**Google Fonts redirects handle:**
+- CSS API requests (`fonts.googleapis.com/css2?family=…`)
+- Legacy CSS API (`fonts.googleapis.com/css?family=…`)
+- Icon fonts (`fonts.googleapis.com/icon?family=…`)
+- Any other `fonts.googleapis.com` path
+
+When a Google Fonts request is redirected to Bunny Fonts, the CSS returned references Bunny's CDN for the actual font files — so `fonts.gstatic.com` (Google's font file server) is never contacted either.
 
 ---
 
@@ -37,7 +46,7 @@ When you click a YouTube or Reddit link — from a search result, another site, 
 Switcheroo is built with privacy as the primary design goal — not an afterthought.
 
 - **Zero telemetry.** No analytics, no crash reporting, no usage data. Nothing is ever sent to any server controlled by this extension.
-- **The extension never sees your URLs.** Redirects use the browser's Declarative Net Request API, which operates at the browser level. Extension JavaScript code never sees which videos you watch or which subreddits you visit.
+- **The extension never sees your URLs.** Redirects use the browser's Declarative Net Request API, which operates at the browser level. Extension JavaScript code never sees which videos you watch, which subreddits you visit, or which fonts a site loads.
 - **Local storage only.** Settings are stored in `chrome.storage.local` — not synced to Google's servers.
 - **HTTPS only.** All redirect targets must use HTTPS. HTTP instances are rejected automatically.
 - **Cloudflare instances excluded by default.** Cloudflare acts as a middleman that can log traffic, defeating the purpose of a privacy frontend. Cloudflare-backed instances are shown separately in settings with a clear warning.
@@ -47,24 +56,31 @@ Switcheroo is built with privacy as the primary design goal — not an afterthou
   - `https://api.invidious.io/instances.json` (Invidious)
   - `https://raw.githubusercontent.com/redlib-org/redlib-instances/refs/heads/main/instances.json` (Redlib)
 
-  These requests are made at install time and once per hour. They contain no user data beyond a standard browser request. If you prefer not to make these requests, the extension falls back to a bundled list of curated instances.
+  These requests are made at install time and once per hour. They contain no user data beyond a standard browser request. The Google Fonts → Bunny Fonts redirect makes no extension-initiated fetch calls — Bunny Fonts is a static redirect target, not a fetched instance list. If you prefer not to make these requests, the extension falls back to a bundled list of curated instances.
 
 ---
 
 ## Features
 
-### Instance modes
+### Instance modes (YouTube & Reddit)
 
 **Random (default):** Switcheroo picks a random instance from your enabled list. The instance rotates on every browser startup and every hour, so you're not always going to the same place.
 
 **Fixed:** Always redirect to one specific instance of your choice. Useful if you have an account or preferences saved on a particular instance.
 
-### Instance management
+### Instance management (YouTube & Reddit)
 
 - Enable or disable individual instances from a list that is kept up to date automatically
 - Cloudflare-backed instances are shown separately with a warning badge and are off by default
 - Add a custom instance URL (must be HTTPS)
 - Instances are filtered to only show those with >80% uptime (Invidious; Redlib does not expose uptime data)
+
+### Google Fonts → Bunny Fonts
+
+Bunny Fonts (`fonts.bunny.net`) is a drop-in API replacement for Google Fonts:
+- Identical URL and query-parameter structure — no site compatibility issues
+- No tracking, GDPR-compliant, operated by BunnyWay d.o.o. (Slovenia/EU)
+- Enable or disable with a single toggle; no instance management needed
 
 ---
 
@@ -80,7 +96,7 @@ Switcheroo is currently available as an unpacked extension for development and p
 4. Select the `Switcheroo` folder (the one containing `manifest.json`)
 5. The extension icon will appear in your toolbar
 
-On first load, Switcheroo fetches the latest instance lists and sets up redirect rules automatically. Visit `youtube.com` or `reddit.com` to confirm it's working.
+On first load, Switcheroo fetches the latest instance lists and sets up redirect rules automatically. Visit `youtube.com`, `reddit.com`, or any site using Google Fonts to confirm it's working.
 
 > **Note:** Unpacked extensions show a "developer mode" banner in Brave on each startup. This is a browser restriction, not something Switcheroo can control.
 
@@ -92,21 +108,25 @@ On first load, Switcheroo fetches the latest instance lists and sets up redirect
 
 Click the 🦘 kangaroo icon in your toolbar to open the popup. From here you can:
 
-- Toggle YouTube and Reddit redirects on or off with a single click
+- Toggle YouTube, Reddit, and Google Fonts redirects on or off
 - See your current redirect mode and active instance count
 - Refresh the instance list
 - Open the full settings page
 
 ### Settings page
 
-Click **Settings** in the popup (or right-click the icon → *Options*) to open the full settings page. For each service you can:
+Click **Settings** in the popup (or right-click the icon → *Options*) to open the full settings page.
 
+For **YouTube** and **Reddit** you can:
 - Enable or disable the redirect
 - Switch between **Random** and **Fixed** mode
 - In Fixed mode: choose from the dropdown or enter a custom HTTPS URL
 - Enable or disable individual instances using checkboxes
 - Refresh the instance list on demand
-- View Cloudflare-backed instances (collapsed by default, with a warning)
+- View Cloudflare-backed instances (shown separately with a warning)
+
+For **Google Fonts** you can:
+- Enable or disable the redirect (always routes to Bunny Fonts)
 
 ---
 
@@ -120,7 +140,8 @@ Switcheroo/
 ├── services/
 │   ├── registry.js         — Service registry (the only file to edit when adding a new service)
 │   ├── youtube.js          — YouTube → Invidious: URL patterns and DNR rules
-│   └── reddit.js           — Reddit → Redlib: URL patterns and DNR rules
+│   ├── reddit.js           — Reddit → Redlib: URL patterns and DNR rules
+│   └── googlefonts.js      — Google Fonts → Bunny Fonts: static redirect
 │
 ├── utils/
 │   ├── validate.js         — Instance URL validation (HTTPS-only, no source domains)
@@ -129,8 +150,9 @@ Switcheroo/
 │   └── dnr.js              — DNR rule management
 │
 ├── data/
-│   ├── youtube-fallback.json  — Bundled Invidious instances (used if network unavailable)
-│   └── reddit-fallback.json   — Bundled Redlib instances
+│   ├── youtube-fallback.json     — Bundled Invidious instances (used if network unavailable)
+│   ├── reddit-fallback.json      — Bundled Redlib instances
+│   └── googlefonts-fallback.json — Bunny Fonts static entry
 │
 ├── popup.html / popup.css / popup.js      — Toolbar popup UI
 ├── options.html / options.css / options.js — Full settings page
@@ -169,11 +191,12 @@ DNR rules include `excludedInitiatorDomains` containing all known instance hostn
 
 ### Rule ID ranges
 
-| Service | IDs |
-|---------|-----|
-| YouTube | 1000 – 1999 |
-| Reddit  | 2000 – 2999 |
-| Future  | 3000+… |
+| Service | IDs | Type |
+|---------|-----|------|
+| YouTube | 1000 – 1999 | Instance-based (random/fixed) |
+| Reddit  | 2000 – 2999 | Instance-based (random/fixed) |
+| Google Fonts | 3000 – 3999 | Static redirect (always Bunny Fonts) |
+| Future  | 4000+… | — |
 
 ---
 
@@ -189,20 +212,20 @@ Switcheroo's registry pattern makes adding services straightforward. No existing
      name: 'My Service',
      description: 'Redirect to a privacy frontend.',
      sourceHosts: ['myservice.com', 'www.myservice.com'],
-     ruleIdStart: 3000,
-     ruleIdEnd: 3999,
+     ruleIdStart: 4000,
+     ruleIdEnd: 4999,
      instanceFetcher: {
        url: 'https://instances.example.com/list.json',
        cacheTTLMs: 3_600_000,
        parse(raw) { /* return Instance[] */ },
        fallbackFile: 'data/myservice-fallback.json',
      },
-     buildRules(extensionId, settings, excludedInitiatorDomains) {
+     buildRules(_extensionId, settings, excludedInitiatorDomains) {
        if (!settings.enabled || !settings.currentInstance) return [];
        const instance = settings.currentInstance;
        return [
          {
-           id: 3000,
+           id: 4000,
            priority: 1,
            condition: {
              regexFilter: '^https?://(www\\.)?myservice\\.com(/.*)',
@@ -230,6 +253,8 @@ Switcheroo's registry pattern makes adding services straightforward. No existing
    };
    ```
 
+   For a **static redirect** (single fixed target, no instance list), set `instanceFetcher.url: null` and `instanceFetcher.cacheTTLMs: Infinity`. See `services/googlefonts.js` for a complete example.
+
 2. **Create `data/myservice-fallback.json`** with a few known-good instances:
 
    ```json
@@ -246,8 +271,19 @@ Switcheroo's registry pattern makes adding services straightforward. No existing
    const SERVICES = [
      youtubeService,
      redditService,
+     googleFontsService,
      myService,   // ← add here
    ];
+   ```
+
+4. **Add UI labels** in `options.js` and `popup.js`:
+
+   ```js
+   // options.js SERVICE_META
+   myservice: { label: 'My Service', target: 'My Frontend' },
+
+   // popup.js SERVICE_META
+   myservice: { label: 'My Service', target: 'My Frontend', accentColor: '#C9B8F0' },
    ```
 
 That's it. The popup, options page, background worker, and DNR manager all discover services dynamically from the registry.
@@ -266,15 +302,16 @@ Switcheroo requests the minimum permissions necessary:
 | Host: `api.invidious.io` | Fetch Invidious instance list |
 | Host: `raw.githubusercontent.com` | Fetch Redlib instance list |
 
-No `tabs`, `history`, `cookies`, `webRequest`, or broad host permissions are requested.
+No `tabs`, `history`, `cookies`, `webRequest`, or broad host permissions are requested. The Google Fonts service requires no additional host permissions — it is a static redirect with no instance API to fetch.
 
 ---
 
 ## Known limitations
 
 - **Timestamps and playlist context on watch pages are not forwarded.** When redirecting a YouTube watch URL, only the video ID (`v=`) is preserved. Timestamps (`t=`) and playlist context (`list=`) are stripped. This is intentional — it avoids forwarding unnecessary URL data and keeps the DNR rules simple.
-- **Reddit query parameters are not forwarded.** Sort order (`?sort=new`) and pagination tokens are dropped. The path (subreddit, post, user) is always preserved.
+- **Reddit query parameters are not forwarded.** Sort order (`?sort=new`) and pagination tokens are dropped on subreddit and post pages. The path (subreddit, post, user) is always preserved. Search queries (`?q=`) are preserved on the search page.
 - **Instance randomisation is per-session, not per-visit.** The same instance is used for the duration of a browser session (rotated on startup and hourly). This means within a session you always land on the same instance, which is better for consistency (saved preferences, watch history on that instance) but less random than per-visit selection.
+- **Hardcoded `fonts.gstatic.com` URLs are not intercepted.** Google Fonts requests via the CSS API (`fonts.googleapis.com`) are fully redirected to Bunny Fonts, and the CSS returned by Bunny references Bunny's CDN for font files — so `fonts.gstatic.com` is never contacted in the common case. However, pages that hardcode direct `fonts.gstatic.com` font-file URLs (rather than using the CSS API) would still contact Google's servers. This is rare in practice.
 
 ---
 

@@ -86,11 +86,15 @@ export const redditService = {
         action: redirect(`${instance}/search?q=\\2`),
       },
 
-      // 2001 — Reddit homepage (priority 2: exact match, must beat path catch-all)
+      // 2001 — Reddit homepage with optional query string / fragment
+      //   (priority 2: must beat path catch-all)
+      //   ^…\.com/? — optional trailing slash
+      //   (?:[?#].*)? — optional query string or hash (e.g. ?sort=hot, ?ref=homepage)
+      //   Fixes: reddit.com/?sort=hot previously slipped through and hit Reddit directly.
       {
         id: 2001,
         priority: 2,
-        condition: cond('^https?://(www\\.)?reddit\\.com/?$'),
+        condition: cond('^https?://(www\\.)?reddit\\.com/?(?:[?#].*)?$'),
         action: redirect(`${instance}/`),
       },
 
