@@ -106,7 +106,7 @@ export const youtubeService = {
       {
         ...shared,
         id: 1000,
-        condition: cond('^https?://(www\\.)?youtube\\.com/watch\\?v=([a-zA-Z0-9_-]{11})'),
+        condition: cond('^https?://(www\\.)?youtube\\.com/watch\\?v=([a-zA-Z0-9_-]+)'),
         action: { type: 'redirect', ...sub('/watch?v=\\2') },
       },
 
@@ -114,7 +114,7 @@ export const youtubeService = {
       {
         ...shared,
         id: 1001,
-        condition: cond('^https?://(www\\.)?youtube\\.com/shorts/([a-zA-Z0-9_-]{11})'),
+        condition: cond('^https?://(www\\.)?youtube\\.com/shorts/([a-zA-Z0-9_-]+)'),
         action: { type: 'redirect', ...sub('/watch?v=\\2') },
       },
 
@@ -139,7 +139,7 @@ export const youtubeService = {
         ...shared,
         id: 1004,
         condition: cond(
-          '^https?://(www\\.)?youtube\\.com/embed/([a-zA-Z0-9_-]{11})',
+          '^https?://(www\\.)?youtube\\.com/embed/([a-zA-Z0-9_-]+)',
           ['main_frame', 'sub_frame']
         ),
         action: { type: 'redirect', ...sub('/embed/\\2') },
@@ -151,7 +151,7 @@ export const youtubeService = {
         ...shared,
         id: 1009,
         condition: cond(
-          '^https?://(www\\.)?youtube-nocookie\\.com/embed/([a-zA-Z0-9_-]{11})',
+          '^https?://(www\\.)?youtube-nocookie\\.com/embed/([a-zA-Z0-9_-]+)',
           ['main_frame', 'sub_frame']
         ),
         action: { type: 'redirect', ...sub('/embed/\\2') },
@@ -185,7 +185,7 @@ export const youtubeService = {
       {
         ...shared,
         id: 1008,
-        condition: cond('^https?://youtu\\.be/([a-zA-Z0-9_-]{11})'),
+        condition: cond('^https?://youtu\\.be/([a-zA-Z0-9_-]+)'),
         action: { type: 'redirect', ...sub('/watch?v=\\1') },
       },
     ];
