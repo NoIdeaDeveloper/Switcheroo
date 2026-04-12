@@ -16,6 +16,12 @@ function sendMessage(message) {
 const SERVICE_META = {
   youtube: { label: 'YouTube', target: 'Invidious' },
   reddit:  { label: 'Reddit',  target: 'Redlib'    },
+  googlefonts: {
+    label: 'Google Fonts',
+    target: 'Bunny Fonts',
+    staticRedirect: true,
+    description: 'Redirects Google Fonts to fonts.bunny.net — a privacy-friendly, GDPR-compliant CDN. No Google tracking. Works for every font.',
+  },
 };
 
 function debounce(fn, ms) {
@@ -57,11 +63,22 @@ function buildSection(serviceId, settings, instances) {
   // Body
   const body = document.createElement('div');
   body.className = 'section-body';
-  body.append(
-    buildModeSelector(serviceId, svc),
-    buildFixedPicker(serviceId, svc, instances),
-    buildInstanceList(serviceId, svc, instances),
-  );
+
+  if (meta.staticRedirect) {
+    // Static-redirect services (e.g. Google Fonts) have a single fixed target
+    // and no instance list to manage — just show an info description.
+    const desc = document.createElement('p');
+    desc.className = 'static-redirect-desc';
+    desc.textContent = meta.description ?? '';
+    body.append(desc);
+  } else {
+    body.append(
+      buildModeSelector(serviceId, svc),
+      buildFixedPicker(serviceId, svc, instances),
+      buildInstanceList(serviceId, svc, instances),
+    );
+  }
+
   section.append(body);
   return section;
 }

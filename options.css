@@ -450,6 +450,15 @@ html, body {
   padding: 4px 2px;
 }
 
+/* ── Static-redirect service description ─────────────────────── */
+
+.static-redirect-desc {
+  font-size: 14px;
+  color: var(--text-mid);
+  line-height: 1.65;
+  padding: 2px 0;
+}
+
 /* ── Privacy section ──────────────────────────────────────────── */
 
 .privacy-section .section-body {

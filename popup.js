@@ -14,8 +14,9 @@ function sendMessage(message) {
 }
 
 const SERVICE_META = {
-  youtube: { label: 'YouTube',  target: 'Invidious', accentColor: '#FFBA93' },
-  reddit:  { label: 'Reddit',   target: 'Redlib',    accentColor: '#98D4B4' },
+  youtube:     { label: 'YouTube',      target: 'Invidious',  accentColor: '#FFBA93' },
+  reddit:      { label: 'Reddit',       target: 'Redlib',     accentColor: '#98D4B4' },
+  googlefonts: { label: 'Google Fonts', target: 'Bunny Fonts', accentColor: '#C9B8F0', staticRedirect: true },
 };
 
 // ─── Card rendering ───────────────────────────────────────────────────────────
@@ -89,8 +90,15 @@ function buildStatusRow(serviceId, settings, instances) {
   const text = document.createElement('span');
   text.className = 'status-text';
 
+  const meta = SERVICE_META[serviceId] ?? {};
+
   if (!settings.enabled) {
     text.textContent = 'Disabled';
+    left.append(dot, text);
+  } else if (meta.staticRedirect) {
+    // Static-redirect services always use a single fixed target — show it directly.
+    const host = hostOnly(settings.currentInstance ?? meta.target);
+    text.innerHTML = `→ <strong>${escHtml(host)}</strong>`;
     left.append(dot, text);
   } else if (settings.mode === 'fixed' && settings.currentInstance) {
     const host = hostOnly(settings.currentInstance);

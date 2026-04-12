@@ -24,6 +24,9 @@ import { getInstanceCache, setInstanceCache, isCacheStale } from './storage.js';
  * @returns {Promise<import('../services/registry.js').Instance[]|null>}
  */
 export async function fetchInstances(service) {
+  // Static-redirect services (e.g. Google Fonts) have no live API to poll.
+  if (!service.instanceFetcher.url) return null;
+
   try {
     const response = await fetch(service.instanceFetcher.url);
     if (!response.ok) {

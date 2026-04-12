@@ -143,8 +143,12 @@ chrome.alarms.onAlarm.addListener(async alarm => {
   const services = getAll();
   const extensionId = chrome.runtime.id;
 
-  // Fetch fresh instance data for all services
-  await Promise.all(services.map(service => fetchInstances(service).catch(() => {})));
+  // Fetch fresh instance data for services that have a live API (skip static-redirect services).
+  await Promise.all(
+    services
+      .filter(s => s.instanceFetcher.url)
+      .map(service => fetchInstances(service).catch(() => {}))
+  );
 
   // Rotate instances and rebuild rules
   await rotateAllInstances(extensionId);
