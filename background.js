@@ -250,7 +250,15 @@ async function handleMessage(message) {
 
     case 'getInstances': {
       const { serviceId } = message;
-      const instances = await getCachedInstances(serviceId);
+      const service = getById(serviceId);
+      if (!service) return [];
+
+      // If the cache is empty (e.g. popup opened before fullInit completed),
+      // trigger a fetch now and wait for it rather than returning an empty list.
+      let instances = await getCachedInstances(serviceId);
+      if (instances.length === 0) {
+        instances = await getCachedOrFetchInstances(service);
+      }
       return instances;
     }
 

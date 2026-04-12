@@ -1,21 +1,7 @@
 /**
- * options.js
- * Full settings page. Communicates with the background service worker
- * via chrome.runtime.sendMessage.
- *
- * Features per service:
- *   - Enable/disable toggle
- *   - Mode selector: Random / Fixed
- *   - Fixed-mode: dropdown of available instances + custom URL input
- *   - Instance list with individual checkboxes (opt-out model)
- *   - Cloudflare instances in separate collapsible section with warning
- *   - Refresh instances button
- *
- * No network requests from this page (CSP: connect-src 'none').
- * All data flows through sendMessage → background service worker.
+ * options.js — Switcheroo full settings page.
+ * No network requests. All data flows through sendMessage → background.
  */
-
-// ─── Messaging ────────────────────────────────────────────────────────────────
 
 function sendMessage(message) {
   return new Promise((resolve, reject) => {
@@ -27,90 +13,69 @@ function sendMessage(message) {
   });
 }
 
-// ─── Service metadata ─────────────────────────────────────────────────────────
-
 const SERVICE_META = {
   youtube: { label: 'YouTube', target: 'Invidious' },
-  reddit:  { label: 'Reddit',  target: 'Redlib' },
+  reddit:  { label: 'Reddit',  target: 'Redlib'    },
 };
 
-// ─── Debounce ─────────────────────────────────────────────────────────────────
-
 function debounce(fn, ms) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
-  };
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
-// ─── Save helper ──────────────────────────────────────────────────────────────
-
 const debouncedSave = debounce(async (serviceId, patch) => {
-  try {
-    await sendMessage({ action: 'setServiceSettings', serviceId, settings: patch });
-  } catch (err) {
-    console.error('[Switcheroo] Failed to save settings:', err);
-  }
-}, 300);
+  try { await sendMessage({ action: 'setServiceSettings', serviceId, settings: patch }); }
+  catch (err) { console.error('[Switcheroo] Save failed:', err); }
+}, 350);
 
-// ─── Rendering ────────────────────────────────────────────────────────────────
+// ─── Section builder ──────────────────────────────────────────────────────────
 
-/**
- * Builds the full section for one service.
- */
-function buildServiceSection(serviceId, settings, instances) {
-  const meta = SERVICE_META[serviceId] ?? { label: serviceId, target: '?' };
-  const svc = settings[serviceId] ?? {};
+function buildSection(serviceId, settings, instances) {
+  const meta = SERVICE_META[serviceId];
+  const svc  = settings[serviceId] ?? {};
 
   const section = document.createElement('section');
   section.className = 'section';
   section.id = `section-${serviceId}`;
 
-  // ── Section header ───────────────────────────────
+  // Header
   const header = document.createElement('div');
   header.className = 'section-header';
 
   const titleRow = document.createElement('div');
   titleRow.className = 'section-title-row';
-
   titleRow.innerHTML = `
-    <h2 class="section-title">${escapeHtml(meta.label)}</h2>
-    <span class="section-title-arrow">→</span>
-    <span class="section-target">${escapeHtml(meta.target)}</span>
+    <h2 class="section-title">${escHtml(meta.label)}</h2>
+    <span class="section-arrow">→</span>
+    <span class="section-target">${escHtml(meta.target)}</span>
   `;
 
   const toggle = buildToggle(serviceId, svc.enabled ?? true);
   header.append(titleRow, toggle);
   section.append(header);
 
-  // ── Section body ─────────────────────────────────
+  // Body
   const body = document.createElement('div');
   body.className = 'section-body';
-
-  // Mode selector
-  body.append(buildModeSelector(serviceId, svc));
-
-  // Fixed instance picker (shown only in fixed mode)
-  const fixedWrap = buildFixedInstancePicker(serviceId, svc, instances);
-  body.append(fixedWrap);
-
-  // Instance list
-  body.append(buildInstanceList(serviceId, svc, instances));
-
+  body.append(
+    buildModeSelector(serviceId, svc),
+    buildFixedPicker(serviceId, svc, instances),
+    buildInstanceList(serviceId, svc, instances),
+  );
   section.append(body);
   return section;
 }
 
+// ── Toggle ────────────────────────────────────────────────────────────────────
+
 function buildToggle(serviceId, checked) {
-  const label = document.createElement('label');
-  label.className = 'toggle';
-  label.setAttribute('aria-label', `Enable ${SERVICE_META[serviceId]?.label ?? serviceId}`);
+  const lbl = document.createElement('label');
+  lbl.className = 'toggle';
+  lbl.setAttribute('aria-label', `Enable ${SERVICE_META[serviceId]?.label} redirect`);
 
   const input = document.createElement('input');
   input.type = 'checkbox';
   input.checked = checked;
-  input.id = `toggle-${serviceId}`;
 
   const track = document.createElement('span');
   track.className = 'toggle-track';
@@ -118,91 +83,83 @@ function buildToggle(serviceId, checked) {
   const thumb = document.createElement('span');
   thumb.className = 'toggle-thumb';
 
-  input.addEventListener('change', () => {
-    debouncedSave(serviceId, { enabled: input.checked });
-  });
-
-  label.append(input, track, thumb);
-  return label;
+  input.addEventListener('change', () => debouncedSave(serviceId, { enabled: input.checked }));
+  lbl.append(input, track, thumb);
+  return lbl;
 }
+
+// ── Mode selector ─────────────────────────────────────────────────────────────
 
 function buildModeSelector(serviceId, svc) {
   const group = document.createElement('div');
   group.className = 'field-group';
 
-  const label = document.createElement('div');
-  label.className = 'field-label';
-  label.textContent = 'Redirect mode';
+  const lbl = document.createElement('div');
+  lbl.className = 'field-label';
+  lbl.textContent = 'Redirect mode';
 
-  const selector = document.createElement('div');
-  selector.className = 'mode-selector';
+  const sel = document.createElement('div');
+  sel.className = 'mode-selector';
 
   const modes = [
-    { value: 'random', label: 'Random (rotates hourly)' },
-    { value: 'fixed',  label: 'Fixed instance' },
+    { value: 'random', text: '🎲  Random (rotates hourly)' },
+    { value: 'fixed',  text: '📌  Fixed instance'          },
   ];
 
-  for (const mode of modes) {
+  for (const m of modes) {
     const btn = document.createElement('button');
-    btn.className = `mode-btn${svc.mode === mode.value ? ' active' : ''}`;
-    btn.textContent = mode.label;
-    btn.dataset.mode = mode.value;
-    btn.dataset.serviceId = serviceId;
+    btn.className = `mode-btn${svc.mode === m.value ? ' active' : ''}`;
+    btn.textContent = m.text;
 
     btn.addEventListener('click', () => {
-      selector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      sel.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-
-      // Show/hide fixed instance picker
       const fixedWrap = document.getElementById(`fixed-wrap-${serviceId}`);
-      if (fixedWrap) fixedWrap.classList.toggle('visible', mode.value === 'fixed');
-
-      debouncedSave(serviceId, { mode: mode.value });
+      if (fixedWrap) fixedWrap.classList.toggle('visible', m.value === 'fixed');
+      debouncedSave(serviceId, { mode: m.value });
     });
-
-    selector.append(btn);
+    sel.append(btn);
   }
 
-  group.append(label, selector);
+  group.append(lbl, sel);
   return group;
 }
 
-function buildFixedInstancePicker(serviceId, svc, instances) {
+// ── Fixed instance picker ─────────────────────────────────────────────────────
+
+function buildFixedPicker(serviceId, svc, instances) {
   const wrap = document.createElement('div');
   wrap.className = `fixed-instance-wrap${svc.mode === 'fixed' ? ' visible' : ''}`;
   wrap.id = `fixed-wrap-${serviceId}`;
 
-  const group = document.createElement('div');
-  group.className = 'field-group';
+  // Dropdown
+  const grp1 = document.createElement('div');
+  grp1.className = 'field-group';
 
-  const label = document.createElement('div');
-  label.className = 'field-label';
-  label.textContent = 'Choose instance';
+  const lbl1 = document.createElement('div');
+  lbl1.className = 'field-label';
+  lbl1.textContent = 'Choose from available instances';
 
-  // Dropdown of known instances
   const select = document.createElement('select');
   select.className = 'instance-select';
-  select.id = `fixed-select-${serviceId}`;
 
-  const clearOpt = document.createElement('option');
-  clearOpt.value = '';
-  clearOpt.textContent = '— Select an instance —';
-  select.append(clearOpt);
+  const placeholder = new Option('— Select an instance —', '');
+  select.append(placeholder);
 
   const nonCF = instances.filter(i => !i.cloudflare);
-  const cfInstances = instances.filter(i => i.cloudflare);
+  const cfList = instances.filter(i => i.cloudflare);
 
   for (const inst of nonCF) {
-    const opt = new Option(formatInstanceOption(inst), inst.url);
+    const opt = new Option(formatOpt(inst), inst.url);
     if (svc.fixedInstance === inst.url) opt.selected = true;
     select.append(opt);
   }
 
-  if (cfInstances.length > 0) {
+  if (cfList.length) {
     const grp = document.createElement('optgroup');
     grp.label = '⚠ Cloudflare instances';
-    for (const inst of cfInstances) {
-      const opt = new Option(`⚠ ${formatInstanceOption(inst)}`, inst.url);
+    for (const inst of cfList) {
+      const opt = new Option(`⚠ ${formatOpt(inst)}`, inst.url);
       if (svc.fixedInstance === inst.url) opt.selected = true;
       grp.append(opt);
     }
@@ -210,45 +167,36 @@ function buildFixedInstancePicker(serviceId, svc, instances) {
   }
 
   select.addEventListener('change', () => {
-    if (select.value) {
-      debouncedSave(serviceId, { fixedInstance: select.value });
-    }
+    if (select.value) debouncedSave(serviceId, { fixedInstance: select.value });
   });
 
-  group.append(label, select);
+  grp1.append(lbl1, select);
 
-  // Custom URL input
-  const customGroup = document.createElement('div');
-  customGroup.className = 'field-group';
+  // Custom URL
+  const grp2 = document.createElement('div');
+  grp2.className = 'field-group';
 
-  const customLabel = document.createElement('div');
-  customLabel.className = 'field-label';
-  customLabel.textContent = 'Or enter a custom HTTPS instance URL';
+  const lbl2 = document.createElement('div');
+  lbl2.className = 'field-label';
+  lbl2.textContent = 'Or enter a custom HTTPS URL';
 
-  const customWrap = document.createElement('div');
-  customWrap.className = 'custom-url-wrap';
+  const row = document.createElement('div');
+  row.className = 'custom-url-wrap';
 
   const input = document.createElement('input');
   input.type = 'url';
   input.className = 'custom-url-input';
   input.placeholder = 'https://your-instance.example.com';
-  input.id = `custom-url-${serviceId}`;
 
   const useBtn = document.createElement('button');
-  useBtn.className = 'btn-use-custom';
+  useBtn.className = 'btn-use';
   useBtn.textContent = 'Use';
 
   useBtn.addEventListener('click', () => {
     const val = input.value.trim();
-    if (!val.startsWith('https://')) {
-      input.classList.add('invalid');
-      return;
-    }
+    if (!val.startsWith('https://')) { input.classList.add('invalid'); return; }
     input.classList.remove('invalid');
-
-    // Add to dropdown if not already present
-    const exists = Array.from(select.options).some(o => o.value === val);
-    if (!exists) {
+    if (!Array.from(select.options).some(o => o.value === val)) {
       const opt = new Option(val.replace('https://', ''), val);
       select.insertBefore(opt, select.options[1]);
     }
@@ -258,158 +206,133 @@ function buildFixedInstancePicker(serviceId, svc, instances) {
   });
 
   input.addEventListener('input', () => input.classList.remove('invalid'));
+  row.append(input, useBtn);
+  grp2.append(lbl2, row);
 
-  customWrap.append(input, useBtn);
-  customGroup.append(customLabel, customWrap);
-
-  wrap.append(group, customGroup);
+  wrap.append(grp1, grp2);
   return wrap;
 }
+
+// ── Instance list ─────────────────────────────────────────────────────────────
 
 function buildInstanceList(serviceId, svc, instances) {
   const group = document.createElement('div');
   group.className = 'field-group';
 
-  // Header row: label + last-updated + refresh button
   const headerRow = document.createElement('div');
   headerRow.className = 'instance-list-header';
 
-  const labelEl = document.createElement('div');
-  labelEl.className = 'field-label';
-  labelEl.textContent = 'Available instances';
+  const lbl = document.createElement('div');
+  lbl.className = 'field-label';
+  lbl.textContent = 'Available instances';
+
+  const countEl = document.createElement('span');
+  countEl.className = 'instance-count';
+  countEl.id = `instance-count-${serviceId}`;
+  countEl.textContent = `${instances.length} instance${instances.length !== 1 ? 's' : ''}`;
 
   const refreshBtn = document.createElement('button');
-  refreshBtn.className = 'btn-refresh-instances';
-  refreshBtn.id = `refresh-btn-${serviceId}`;
-  refreshBtn.innerHTML = `
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M13.65 2.35A8 8 0 1 0 15 8h-2a6 6 0 1 1-1.1-3.47L10 6h5V1l-1.35 1.35Z" fill="currentColor"/>
-    </svg>
-    Refresh
-  `;
+  refreshBtn.className = 'btn-refresh-list';
+  refreshBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.65 2.35A8 8 0 1 0 15 8h-2a6 6 0 1 1-1.1-3.47L10 6h5V1l-1.35 1.35Z" fill="currentColor"/></svg> Refresh`;
 
   refreshBtn.addEventListener('click', async () => {
     refreshBtn.disabled = true;
-    const icon = refreshBtn.querySelector('svg');
-    icon?.classList.add('spinning');
-
+    const svg = refreshBtn.querySelector('svg');
+    svg?.classList.add('spinning');
     try {
       const result = await sendMessage({ action: 'refreshInstances', serviceId });
-      const freshInstances = await sendMessage({ action: 'getInstances', serviceId });
+      const fresh = await sendMessage({ action: 'getInstances', serviceId });
       const freshSettings = await sendMessage({ action: 'getSettings' });
-
-      // Re-render the instance list
       const oldList = document.getElementById(`list-${serviceId}`);
-      const newList = buildInstanceListItems(serviceId, freshSettings[serviceId], freshInstances);
+      const newList = buildInstanceRows(serviceId, freshSettings[serviceId], fresh ?? []);
       newList.id = `list-${serviceId}`;
       oldList?.replaceWith(newList);
-
-      const countEl = document.getElementById(`instance-count-${serviceId}`);
-      if (countEl) countEl.textContent = `Updated · ${result.count} instances`;
-    } catch (err) {
-      console.error(err);
-    } finally {
-      refreshBtn.disabled = false;
-      icon?.classList.remove('spinning');
-    }
+      countEl.textContent = `Updated · ${result.count} instances`;
+    } catch (err) { console.error(err); }
+    finally { refreshBtn.disabled = false; svg?.classList.remove('spinning'); }
   });
 
-  headerRow.append(labelEl, refreshBtn);
+  headerRow.append(lbl);
+  const rightRow = document.createElement('div');
+  rightRow.style.cssText = 'display:flex;align-items:center;gap:10px';
+  rightRow.append(countEl, refreshBtn);
+  headerRow.append(rightRow);
 
-  const countEl = document.createElement('div');
-  countEl.className = 'instance-last-updated';
-  countEl.id = `instance-count-${serviceId}`;
-  countEl.textContent = `${instances.length} instance${instances.length !== 1 ? 's' : ''} available`;
-
-  const list = buildInstanceListItems(serviceId, svc, instances);
+  const list = buildInstanceRows(serviceId, svc, instances);
   list.id = `list-${serviceId}`;
 
-  group.append(headerRow, countEl, list);
+  group.append(headerRow, list);
   return group;
 }
 
-function buildInstanceListItems(serviceId, svc, instances) {
+function buildInstanceRows(serviceId, svc, instances) {
   const list = document.createElement('div');
   list.className = 'instance-list';
 
-  const nonCF = instances.filter(i => !i.cloudflare);
-  const cfInstances = instances.filter(i => i.cloudflare);
-
-  if (instances.length === 0) {
+  if (!instances.length) {
     const empty = document.createElement('div');
     empty.className = 'no-instances';
-    empty.textContent = 'No instances loaded. Click Refresh to fetch them.';
+    empty.textContent = 'No instances loaded — click Refresh to fetch them.';
     list.append(empty);
     return list;
   }
 
-  // Normal instances
-  for (const inst of nonCF) {
-    list.append(buildInstanceRow(serviceId, svc, inst, false));
+  const nonCF = instances.filter(i => !i.cloudflare);
+  const cfList = instances.filter(i => i.cloudflare);
+
+  for (const inst of nonCF) list.append(buildRow(serviceId, svc, inst, false));
+
+  if (cfList.length) {
+    const divider = document.createElement('div');
+    divider.className = 'cf-divider';
+    divider.textContent = '⚠ Cloudflare instances — may log your traffic';
+    list.append(divider);
+    for (const inst of cfList) list.append(buildRow(serviceId, svc, inst, true));
   }
 
-  // Cloudflare section
-  if (cfInstances.length > 0) {
-    const cfLabel = document.createElement('div');
-    cfLabel.className = 'cf-section-label';
-    cfLabel.innerHTML = `
-      <span>⚠</span>
-      <span>Cloudflare instances (not recommended — can log your traffic)</span>
-    `;
-    list.append(cfLabel);
-
-    for (const inst of cfInstances) {
-      list.append(buildInstanceRow(serviceId, svc, inst, true));
-    }
-  }
-
-  // Warning if nothing is checked
+  // Warn if nothing is enabled (and non-CF list is non-empty)
   const checkedCount = nonCF.filter(i => isEnabled(i, svc)).length;
-  if (checkedCount === 0 && !svc.allowCloudflare) {
+  if (checkedCount === 0 && nonCF.length > 0) {
     const warn = document.createElement('div');
-    warn.className = 'warn-no-instances';
-    warn.textContent = '⚠ No instances selected — all will be used as fallback.';
+    warn.className = 'warn-no-selection';
+    warn.textContent = '⚠ No instances selected — all instances will be used as fallback.';
     list.append(warn);
   }
 
   return list;
 }
 
-function buildInstanceRow(serviceId, svc, inst, isCF) {
+function buildRow(serviceId, svc, inst, isCF) {
   const row = document.createElement('div');
-  row.className = `instance-item${isCF ? ' cloudflare-item' : ''}`;
+  row.className = `instance-row${isCF ? ' cf-row' : ''}`;
 
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.className = 'instance-checkbox';
-  checkbox.checked = isEnabled(inst, svc);
-  checkbox.dataset.url = inst.url;
-
-  checkbox.addEventListener('change', () => {
-    updateEnabledInstances(serviceId, inst.url, checkbox.checked);
-  });
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'instance-check';
+  cb.checked = isEnabled(inst, svc);
+  cb.addEventListener('change', () => updateEnabled(serviceId, inst.url, cb.checked));
 
   const urlEl = document.createElement('span');
   urlEl.className = 'instance-url';
   urlEl.textContent = inst.url.replace('https://', '');
   urlEl.title = inst.url;
 
-  const meta = document.createElement('span');
+  const meta = document.createElement('div');
   meta.className = 'instance-meta';
 
   if (inst.country) {
     const flag = document.createElement('span');
-    flag.className = 'instance-country';
-    flag.textContent = countryToFlag(inst.country);
+    flag.className = 'instance-flag';
+    flag.textContent = countryFlag(inst.country);
     flag.title = inst.country;
     meta.append(flag);
   }
 
   if (typeof inst.uptime === 'number') {
-    const uptimeEl = document.createElement('span');
-    uptimeEl.className = `instance-uptime${inst.uptime < 80 ? ' low' : ''}`;
-    uptimeEl.textContent = `${Math.round(inst.uptime)}%`;
-    meta.append(uptimeEl);
+    const up = document.createElement('span');
+    up.className = `instance-uptime${inst.uptime < 80 ? ' low' : ''}`;
+    up.textContent = `${Math.round(inst.uptime)}%`;
+    meta.append(up);
   }
 
   if (isCF) {
@@ -419,66 +342,63 @@ function buildInstanceRow(serviceId, svc, inst, isCF) {
     meta.append(badge);
   }
 
-  row.append(checkbox, urlEl, meta);
+  row.append(cb, urlEl, meta);
+  // Clicking the row toggles the checkbox
+  row.addEventListener('click', e => { if (e.target !== cb) cb.click(); });
+
   return row;
 }
 
-// ─── Instance enable/disable ──────────────────────────────────────────────────
+// ── Enable/disable instances ──────────────────────────────────────────────────
 
-const pendingEnabledChanges = {};
+const pendingEnabled = {};
 
-async function updateEnabledInstances(serviceId, url, enabled) {
+async function updateEnabled(serviceId, url, enabled) {
   const settings = await sendMessage({ action: 'getSettings' });
   const svc = settings[serviceId] ?? {};
+  let list = [...(svc.enabledInstances ?? [])];
 
-  let enabledInstances = [...(svc.enabledInstances ?? [])];
-
-  // If the list is empty it means "all enabled" — materialise it first
-  if (enabledInstances.length === 0) {
-    const instances = await sendMessage({ action: 'getInstances', serviceId });
-    enabledInstances = (instances ?? []).map(i => i.url);
+  if (list.length === 0) {
+    // Materialise the "all enabled" implicit state
+    const all = await sendMessage({ action: 'getInstances', serviceId });
+    list = (all ?? []).map(i => i.url);
   }
 
-  if (enabled) {
-    if (!enabledInstances.includes(url)) enabledInstances.push(url);
-  } else {
-    enabledInstances = enabledInstances.filter(u => u !== url);
-  }
+  if (enabled) { if (!list.includes(url)) list.push(url); }
+  else { list = list.filter(u => u !== url); }
 
-  // Debounce the actual save
-  clearTimeout(pendingEnabledChanges[serviceId]);
-  pendingEnabledChanges[serviceId] = setTimeout(() => {
-    sendMessage({ action: 'setServiceSettings', serviceId, settings: { enabledInstances } })
-      .catch(err => console.error('[Switcheroo] Failed to save enabled instances:', err));
-  }, 300);
+  clearTimeout(pendingEnabled[serviceId]);
+  pendingEnabled[serviceId] = setTimeout(() => {
+    sendMessage({ action: 'setServiceSettings', serviceId, settings: { enabledInstances: list } })
+      .catch(console.error);
+  }, 350);
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isEnabled(inst, svc) {
-  if (!svc.enabledInstances || svc.enabledInstances.length === 0) return true;
+  if (!svc.enabledInstances?.length) return true;
   return svc.enabledInstances.includes(inst.url);
 }
 
-function formatInstanceOption(inst) {
+function formatOpt(inst) {
   const host = inst.url.replace('https://', '');
   const parts = [host];
-  if (inst.country) parts.push(countryToFlag(inst.country));
+  if (inst.country) parts.push(countryFlag(inst.country));
   if (typeof inst.uptime === 'number') parts.push(`${Math.round(inst.uptime)}%`);
-  return parts.join(' ');
+  return parts.join(' · ');
 }
 
-function countryToFlag(code) {
+function countryFlag(code) {
   if (!code || code.length !== 2) return '';
-  const offset = 127397;
-  return [...code.toUpperCase()].map(c => String.fromCodePoint(c.charCodeAt(0) + offset)).join('');
+  return [...code.toUpperCase()].map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('');
 }
 
-function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 async function init() {
   const container = document.getElementById('services-container');
@@ -486,13 +406,12 @@ async function init() {
   let settings, allInstances;
   try {
     settings = await sendMessage({ action: 'getSettings' });
-    const ids = Object.keys(SERVICE_META);
     allInstances = {};
-    await Promise.all(ids.map(async id => {
+    await Promise.all(Object.keys(SERVICE_META).map(async id => {
       allInstances[id] = await sendMessage({ action: 'getInstances', serviceId: id }) ?? [];
     }));
   } catch (err) {
-    container.innerHTML = `<div class="loading">Error loading settings. Try reloading the page.</div>`;
+    container.innerHTML = `<div class="loading">Couldn't load settings — try reloading.</div>`;
     console.error(err);
     return;
   }
@@ -501,17 +420,15 @@ async function init() {
 
   for (const id of Object.keys(SERVICE_META)) {
     if (!settings[id]) continue;
-    const section = buildServiceSection(id, settings, allInstances[id] ?? []);
-    container.append(section);
+    container.append(buildSection(id, settings, allInstances[id] ?? []));
   }
 
-  // Scroll to a specific service section if requested from popup
-  const scrollResult = await chrome.storage.local.get('optionsScrollTo');
-  const scrollTarget = scrollResult?.optionsScrollTo;
-  if (scrollTarget) {
+  // Scroll to a specific section if the popup sent us there
+  const { optionsScrollTo } = await chrome.storage.local.get('optionsScrollTo');
+  if (optionsScrollTo) {
     await chrome.storage.local.remove('optionsScrollTo');
-    const el = document.getElementById(`section-${scrollTarget}`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById(`section-${optionsScrollTo}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
 

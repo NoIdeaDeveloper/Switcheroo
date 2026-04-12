@@ -65,7 +65,7 @@ export const redditService = {
     const instance = settings.currentInstance;
     if (!instance) return [];
 
-    const cond = (regexFilter, priority = 1) => ({
+    const cond = (regexFilter) => ({
       regexFilter,
       resourceTypes: ['main_frame'],
       isUrlFilterCaseSensitive: false,
