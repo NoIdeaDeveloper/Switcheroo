@@ -91,6 +91,7 @@ function buildStatusRow(serviceId, settings, instances) {
 
   if (!settings.enabled) {
     text.textContent = 'Disabled';
+    left.append(dot, text);
   } else if (settings.mode === 'fixed' && settings.currentInstance) {
     const host = hostOnly(settings.currentInstance);
     text.innerHTML = `Fixed: <strong>${escHtml(host)}</strong>`;
@@ -109,8 +110,6 @@ function buildStatusRow(serviceId, settings, instances) {
     text.innerHTML = `Random &middot; <strong>${count}</strong> instance${count !== 1 ? 's' : ''}`;
     left.append(dot, text);
   }
-
-  if (!left.hasChildNodes()) left.append(dot, text);
 
   // Settings link
   const link = document.createElement('button');

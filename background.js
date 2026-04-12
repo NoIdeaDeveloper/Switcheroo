@@ -90,12 +90,9 @@ async function fullInit(extensionId) {
   const services = getAll();
   await initializeDefaults(services);
 
-  // Fetch instances for all services in parallel
-  await Promise.all(services.map(async service => {
-    let instances = await getCachedOrFetchInstances(service);
-    if (!instances.length) instances = await loadFallback(service);
-    // setInstanceCache is called inside getCachedOrFetchInstances already
-  }));
+  // Fetch (or load fallback) for all services in parallel.
+  // getCachedOrFetchInstances handles the fallback path and caches the result.
+  await Promise.all(services.map(service => getCachedOrFetchInstances(service)));
 
   await rotateAllInstances(extensionId);
   registerAlarm();
@@ -216,17 +213,21 @@ async function handleMessage(message) {
       const service = getById(serviceId);
       if (!service) throw new Error(`Unknown service: ${serviceId}`);
 
-      await setServiceSettings(serviceId, settings);
+      // Merge the patch with the current settings first, then resolve the new
+      // currentInstance — all in one atomic write so storage.onChanged fires
+      // exactly once with the final, consistent state.
+      const current = await getServiceSettings(serviceId);
+      const merged = { ...current, ...settings };
 
-      // If the user changed mode or fixedInstance, resolve a new currentInstance
-      const updated = await getServiceSettings(serviceId);
-      if (updated.mode === 'fixed' && updated.fixedInstance) {
-        await setServiceSettings(serviceId, { currentInstance: updated.fixedInstance });
-      } else if (updated.mode === 'random') {
-        await rotateInstance(service);
+      if (merged.mode === 'fixed' && merged.fixedInstance) {
+        merged.currentInstance = merged.fixedInstance;
+      } else if (merged.mode === 'random') {
+        const instances = await getCachedInstances(serviceId);
+        merged.currentInstance = resolveCurrentInstance(service, merged, instances);
       }
 
-      await applyRulesForService(service, extensionId, await getServiceSettings(serviceId));
+      await setServiceSettings(serviceId, merged);
+      await applyRulesForService(service, extensionId, merged);
       return { ok: true };
     }
 

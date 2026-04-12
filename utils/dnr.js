@@ -120,7 +120,7 @@ export async function rebuildAllRules(extensionId) {
  *
  * @param {string} extensionId
  */
-export async function removeAllRules(extensionId) {
+export async function removeAllRules(_extensionId) {
   const existingIds = await getExistingRuleIds();
   if (existingIds.length === 0) return;
   await chrome.declarativeNetRequest.updateDynamicRules({

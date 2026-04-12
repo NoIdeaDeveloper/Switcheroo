@@ -69,12 +69,12 @@ export const youtubeService = {
    * Builds DNR rules for the given instance URL.
    * Returns an empty array if the service is disabled or no instance is set.
    *
-   * @param {string} extensionId - unused here (kept for interface consistency)
+   * @param {string} _extensionId - unused (kept for ServiceDefinition interface consistency)
    * @param {import('./registry.js').ServiceSettings} settings
    * @param {string[]} excludedInitiatorDomains - all known instance hostnames
    * @returns {chrome.declarativeNetRequest.Rule[]}
    */
-  buildRules(extensionId, settings, excludedInitiatorDomains = []) {
+  buildRules(_extensionId, settings, excludedInitiatorDomains = []) {
     if (!settings.enabled) return [];
 
     const instance = settings.currentInstance;
