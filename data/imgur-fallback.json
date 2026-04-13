@@ -1,8 +1,8 @@
-{
-  "clearnet": [
-    { "url": "https://rimgo.pussthecat.org",  "country": "DE", "note": "✅ Data not collected" },
-    { "url": "https://imgur.artemislena.eu",   "country": "DE", "note": "✅ Data not collected" },
-    { "url": "https://rimgo.totaldarkness.net","country": "CA", "note": "✅ Data not collected" },
-    { "url": "https://rimgo.hostux.net",       "country": "FR", "note": "✅ Data not collected" }
-  ]
-}
+[
+  { "url": "https://rimgo.pussthecat.org",   "country": "DE", "cloudflare": false, "collectsData": false },
+  { "url": "https://imgur.artemislena.eu",    "country": "DE", "cloudflare": false, "collectsData": false },
+  { "url": "https://rimgo.totaldarkness.net", "country": "CA", "cloudflare": false, "collectsData": false },
+  { "url": "https://rimgo.hostux.net",        "country": "FR", "cloudflare": false, "collectsData": false },
+  { "url": "https://rimgo.smnz.de",           "country": "DE", "cloudflare": false, "collectsData": false },
+  { "url": "https://rimgo.catsarch.com",      "country": "US", "cloudflare": false, "collectsData": false }
+]

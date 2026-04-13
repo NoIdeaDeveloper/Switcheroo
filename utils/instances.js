@@ -93,8 +93,11 @@ export async function loadFallback(service) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const raw = await response.json();
-    // Fallback files are already in Instance[] format
-    return sanitizeInstanceList(Array.isArray(raw) ? raw : [], service.sourceHosts);
+    // Fallback files must be a top-level Instance[] array (url, cloudflare, collectsData fields).
+    // If the file is accidentally in raw API format (object or wrong fields) this will return []
+    // and trigger a console.error below — intentional so mismatches are caught early.
+    if (!Array.isArray(raw)) throw new Error(`Fallback for ${service.id} is not an array`);
+    return sanitizeInstanceList(raw, service.sourceHosts);
   } catch (err) {
     console.error(`[Switcheroo] Failed to load fallback for ${service.id}:`, err);
     return [];

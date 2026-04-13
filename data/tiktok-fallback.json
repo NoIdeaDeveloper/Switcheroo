@@ -1,6 +1,6 @@
 [
-  { "clearnet": "https://proxitok.pabloferreiro.es", "cdn": false, "country": "ES" },
-  { "clearnet": "https://proxitok.esmailelbob.xyz",  "cdn": false, "country": "CA" },
-  { "clearnet": "https://tt.vern.cc",                "cdn": false, "country": "US" },
-  { "clearnet": "https://proxitok.privacydev.net",   "cdn": false, "country": "FR" }
+  { "url": "https://proxitok.pabloferreiro.es", "country": "ES", "cloudflare": false },
+  { "url": "https://proxitok.esmailelbob.xyz",  "country": "CA", "cloudflare": false },
+  { "url": "https://tt.vern.cc",                "country": "US", "cloudflare": false },
+  { "url": "https://proxitok.privacydev.net",   "country": "FR", "cloudflare": false }
 ]
