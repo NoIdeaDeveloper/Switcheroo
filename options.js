@@ -163,7 +163,58 @@ function buildGlobalSection(globalSettings) {
   dmRow.append(dmToggleLabel, dmText);
   dmGroup.append(dmLbl, dmRow);
 
-  body.append(group, dmGroup);
+  // Refresh All button
+  const refreshAllGroup = document.createElement('div');
+  refreshAllGroup.className = 'field-group';
+
+  const refreshAllBtn = document.createElement('button');
+  refreshAllBtn.className = 'btn-refresh-all';
+  refreshAllBtn.id = 'btn-refresh-all';
+  refreshAllBtn.innerHTML =
+    `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.65 2.35A8 8 0 1 0 15 8h-2a6 6 0 1 1-1.1-3.47L10 6h5V1l-1.35 1.35Z" fill="currentColor"/></svg> Refresh All`;
+
+  const refreshAllHint = document.createElement('p');
+  refreshAllHint.className = 'global-setting-hint';
+  refreshAllHint.textContent =
+    'Fetch the latest instance lists for every service at once.';
+
+  refreshAllBtn.addEventListener('click', async () => {
+    const gs = await sendMessage({ action: 'getGlobalSettings' });
+    if (gs.instanceRefreshIntervalMs === null) {
+      const confirmed = await confirmRefreshAll();
+      if (!confirmed) return;
+    }
+
+    refreshAllBtn.disabled = true;
+    refreshAllBtn.querySelector('svg')?.classList.add('spinning');
+    try {
+      await sendMessage({ action: 'refreshAllInstances' });
+      // Update each service's last-fetched indicator
+      for (const id of Object.keys(SERVICE_META)) {
+        if (SERVICE_META[id].staticRedirect) continue;
+        const fetchedEl = document.getElementById(`last-fetched-${id}`);
+        if (fetchedEl) fetchedEl.textContent = 'Fetched: just now';
+        const cacheInfo = await sendMessage({ action: 'getCacheInfo', serviceId: id });
+        const freshInstances = await sendMessage({ action: 'getInstances', serviceId: id });
+        const freshSettings  = await sendMessage({ action: 'getSettings' });
+        const oldList = document.getElementById(`list-${id}`);
+        if (oldList) {
+          const newList = buildInstanceRows(id, freshSettings[id], freshInstances ?? []);
+          newList.id = `list-${id}`;
+          oldList.replaceWith(newList);
+        }
+        const countEl = document.getElementById(`instance-count-${id}`);
+        if (countEl) countEl.textContent = `${cacheInfo.count} instance${cacheInfo.count !== 1 ? 's' : ''}`;
+      }
+    } catch (err) { console.error(err); }
+    finally {
+      refreshAllBtn.disabled = false;
+      refreshAllBtn.querySelector('svg')?.classList.remove('spinning');
+    }
+  });
+
+  refreshAllGroup.append(refreshAllBtn, refreshAllHint);
+  body.append(group, dmGroup, refreshAllGroup);
   bodyWrap.append(body);
   section.append(bodyWrap);
   return section;
@@ -171,7 +222,7 @@ function buildGlobalSection(globalSettings) {
 
 // ─── Section builder ──────────────────────────────────────────────────────────
 
-function buildSection(serviceId, settings, instances, order = 0) {
+function buildSection(serviceId, settings, instances, cacheInfo, order = 0) {
   const meta = SERVICE_META[serviceId];
   const svc  = settings[serviceId] ?? {};
 
@@ -228,7 +279,7 @@ function buildSection(serviceId, settings, instances, order = 0) {
     randomControls.className = `random-controls${svc.mode === 'fixed' ? ' hidden' : ''}`;
     randomControls.append(
       buildRotationInterval(serviceId, svc),
-      buildInstanceList(serviceId, svc, instances),
+      buildInstanceList(serviceId, svc, instances, cacheInfo),
     );
 
     body.append(
@@ -453,7 +504,7 @@ function buildRotationInterval(serviceId, svc) {
 
 // ── Instance list ─────────────────────────────────────────────────────────────
 
-function buildInstanceList(serviceId, svc, instances) {
+function buildInstanceList(serviceId, svc, instances, cacheInfo) {
   const group = document.createElement('div');
   group.className = 'field-group';
 
@@ -495,6 +546,8 @@ function buildInstanceList(serviceId, svc, instances) {
       newList.id = `list-${serviceId}`;
       oldList?.replaceWith(newList);
       countEl.textContent = `Updated · ${result.count} instances`;
+      const fetchedEl = document.getElementById(`last-fetched-${serviceId}`);
+      if (fetchedEl) fetchedEl.textContent = `Fetched: just now`;
     } catch (err) { console.error(err); }
     finally { refreshBtn.disabled = false; svg?.classList.remove('spinning'); }
   });
@@ -505,10 +558,16 @@ function buildInstanceList(serviceId, svc, instances) {
   rightRow.append(countEl, refreshBtn);
   headerRow.append(rightRow);
 
+  // Last-fetched timestamp line
+  const fetchedEl = document.createElement('div');
+  fetchedEl.className = 'instance-list-fetched';
+  fetchedEl.id = `last-fetched-${serviceId}`;
+  fetchedEl.textContent = `Fetched: ${formatRelativeTime(cacheInfo?.fetchedAt ?? null)}`;
+
   const list = buildInstanceRows(serviceId, svc, instances);
   list.id = `list-${serviceId}`;
 
-  group.append(headerRow, list);
+  group.append(headerRow, fetchedEl, list);
   return group;
 }
 
@@ -713,6 +772,102 @@ function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function formatRelativeTime(ts) {
+  if (!ts) return 'Never';
+  const diff = Date.now() - ts;
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return 'Just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+// ── Refresh All confirmation modal ────────────────────────────────────────────
+
+/**
+ * Shows a modal listing all service fetch URLs before triggering a Refresh All
+ * network action. Returns true if the user confirms.
+ * @returns {Promise<boolean>}
+ */
+function confirmRefreshAll() {
+  return new Promise(resolve => {
+    let overlay = document.getElementById('refresh-all-modal-overlay');
+
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'refresh-all-modal-overlay';
+      overlay.className = 'modal-overlay';
+      overlay.setAttribute('hidden', '');
+
+      const box = document.createElement('div');
+      box.className = 'modal-box';
+
+      const icon = document.createElement('div');
+      icon.className = 'modal-icon';
+      icon.textContent = '🌐';
+
+      const title = document.createElement('div');
+      title.className = 'modal-title';
+      title.textContent = 'Refresh all instance lists?';
+
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+
+      // Build the URL list once — it never changes
+      const services = Object.entries(SERVICE_META).filter(([, m]) => !m.staticRedirect);
+      const urlLines = services.map(([, m]) => {
+        const host = (() => { try { return new URL(m.fetchUrl).hostname; } catch { return m.fetchUrl; } })();
+        return `<li><strong>${escHtml(m.label)}</strong> — <code class="fetch-url">${escHtml(host)}</code></li>`;
+      }).join('');
+
+      body.innerHTML =
+        `Automatic updates are turned <strong>Off</strong>. Refreshing all instance lists ` +
+        `will make network requests to the following hosts:<br><br>` +
+        `<ul class="refresh-all-url-list">${urlLines}</ul><br>` +
+        `Each host will see your IP address and browser User-Agent. No browsing history ` +
+        `or redirect activity is included.`;
+
+      const actions = document.createElement('div');
+      actions.className = 'modal-actions';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn-modal-cancel';
+      cancelBtn.textContent = 'Cancel';
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'btn-modal-confirm btn-modal-fetch';
+      confirmBtn.textContent = 'Refresh All';
+
+      actions.append(cancelBtn, confirmBtn);
+      box.append(icon, title, body, actions);
+      overlay.append(box);
+      document.body.append(overlay);
+    }
+
+    overlay.removeAttribute('hidden');
+
+    const cancelBtn  = overlay.querySelector('.btn-modal-cancel');
+    const confirmBtn = overlay.querySelector('.btn-modal-fetch');
+
+    function finish(confirmed) {
+      overlay.setAttribute('hidden', '');
+      cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+      confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+      overlay.removeEventListener('click', onOverlayClick);
+      resolve(confirmed);
+    }
+
+    function onOverlayClick(e) { if (e.target === overlay) finish(false); }
+
+    overlay.querySelector('.btn-modal-cancel').addEventListener('click', () => finish(false));
+    overlay.querySelector('.btn-modal-fetch').addEventListener('click', () => finish(true));
+    overlay.addEventListener('click', onOverlayClick);
+  });
+}
+
 // ── Network-call confirmation modal (shown when auto-refresh is Off) ──────────
 
 /**
@@ -893,15 +1048,19 @@ function confirmPrivacyRisk(flag, instanceUrl) {
 async function init() {
   const container = document.getElementById('services-container');
 
-  let settings, globalSettings, allInstances;
+  let settings, globalSettings, allInstances, allCacheInfo;
   try {
     [settings, globalSettings] = await Promise.all([
       sendMessage({ action: 'getSettings' }),
       sendMessage({ action: 'getGlobalSettings' }),
     ]);
     allInstances = {};
+    allCacheInfo = {};
     await Promise.all(Object.keys(SERVICE_META).map(async id => {
-      allInstances[id] = await sendMessage({ action: 'getInstances', serviceId: id }) ?? [];
+      [allInstances[id], allCacheInfo[id]] = await Promise.all([
+        sendMessage({ action: 'getInstances', serviceId: id }).then(r => r ?? []),
+        sendMessage({ action: 'getCacheInfo', serviceId: id }),
+      ]);
     }));
   } catch (err) {
     container.innerHTML = `<div class="loading">Couldn't load settings — try reloading.</div>`;
@@ -917,7 +1076,7 @@ async function init() {
   let order = 1; // service sections start at order-1 (global is order-0)
   for (const id of Object.keys(SERVICE_META)) {
     if (!settings[id]) continue;
-    container.append(buildSection(id, settings, allInstances[id] ?? [], order++));
+    container.append(buildSection(id, settings, allInstances[id] ?? [], allCacheInfo[id], order++));
   }
 
   // Scroll to a specific section if the popup sent us there

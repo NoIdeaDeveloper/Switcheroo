@@ -19,12 +19,12 @@ function sendMessage(message) {
 }
 
 const SERVICE_META = {
-  youtube:     { label: 'YouTube',      target: 'Invidious',  accentColor: '#FFBA93' },
-  reddit:      { label: 'Reddit',       target: 'Redlib',     accentColor: '#98D4B4' },
-  googlefonts: { label: 'Google Fonts', target: 'Bunny Fonts', accentColor: '#C9B8F0', staticRedirect: true },
-  imgur:       { label: 'Imgur',   target: 'Rimgo',    accentColor: '#8EC0E8' },
-  tiktok:      { label: 'TikTok', target: 'ProxiTok', accentColor: '#D9A0BC' },
-  scribe:      { label: 'Medium', target: 'Scribe',   accentColor: '#AACCA4' },
+  youtube:     { label: 'YouTube',      target: 'Invidious',   accentColor: '#FFBA93', fetchUrl: 'https://api.invidious.io/instances.json?sort_by=type,users' },
+  reddit:      { label: 'Reddit',       target: 'Redlib',      accentColor: '#98D4B4', fetchUrl: 'https://raw.githubusercontent.com/redlib-org/redlib-instances/refs/heads/main/instances.json' },
+  googlefonts: { label: 'Google Fonts', target: 'Bunny Fonts', accentColor: '#C9B8F0', staticRedirect: true, fetchUrl: null },
+  imgur:       { label: 'Imgur',        target: 'Rimgo',       accentColor: '#8EC0E8', fetchUrl: 'https://rimgo.codeberg.page/api.json' },
+  tiktok:      { label: 'TikTok',       target: 'ProxiTok',    accentColor: '#D9A0BC', fetchUrl: 'https://raw.githubusercontent.com/pablouser1/ProxiTok/refs/heads/master/instances.json' },
+  scribe:      { label: 'Medium',       target: 'Scribe',      accentColor: '#AACCA4', fetchUrl: 'https://git.sr.ht/~edwardloveall/scribe/blob/main/docs/instances.md' },
 };
 
 // ─── Card rendering ───────────────────────────────────────────────────────────
@@ -159,6 +159,82 @@ function countActive(instances, settings) {
   return pool.length;
 }
 
+// ─── Refresh All consent modal ────────────────────────────────────────────────
+
+/**
+ * Shows a compact consent modal listing all fetch URLs before triggering
+ * a Refresh All when auto-updates are Off.
+ * @returns {Promise<boolean>}
+ */
+function confirmRefreshAll() {
+  return new Promise(resolve => {
+    let overlay = document.getElementById('popup-refresh-all-overlay');
+
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'popup-refresh-all-overlay';
+      overlay.className = 'popup-modal-overlay';
+      overlay.setAttribute('hidden', '');
+
+      const box = document.createElement('div');
+      box.className = 'popup-modal-box';
+
+      const title = document.createElement('div');
+      title.className = 'popup-modal-title';
+      title.textContent = 'Network requests required';
+
+      const body = document.createElement('div');
+      body.className = 'popup-modal-body';
+
+      const services = Object.values(SERVICE_META).filter(m => !m.staticRedirect && m.fetchUrl);
+      const hostLines = services.map(m => {
+        const host = (() => { try { return new URL(m.fetchUrl).hostname; } catch { return m.fetchUrl; } })();
+        return `<li><strong>${escHtml(m.label)}</strong>: ${escHtml(host)}</li>`;
+      }).join('');
+
+      body.innerHTML =
+        `Refreshing requires contacting:<br>` +
+        `<ul class="popup-modal-url-list">${hostLines}</ul>` +
+        `Your IP &amp; browser will be visible to each host.`;
+
+      const actions = document.createElement('div');
+      actions.className = 'popup-modal-actions';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'popup-modal-btn';
+      cancelBtn.textContent = 'Cancel';
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'popup-modal-btn popup-modal-btn--primary';
+      confirmBtn.textContent = 'Refresh All';
+
+      actions.append(cancelBtn, confirmBtn);
+      box.append(title, body, actions);
+      overlay.append(box);
+      document.body.append(overlay);
+    }
+
+    overlay.removeAttribute('hidden');
+
+    const cancelBtn  = overlay.querySelector('.popup-modal-btn:not(.popup-modal-btn--primary)');
+    const confirmBtn = overlay.querySelector('.popup-modal-btn--primary');
+
+    function finish(confirmed) {
+      overlay.setAttribute('hidden', '');
+      cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+      confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+      overlay.removeEventListener('click', onOverlayClick);
+      resolve(confirmed);
+    }
+
+    function onOverlayClick(e) { if (e.target === overlay) finish(false); }
+
+    overlay.querySelector('.popup-modal-btn:not(.popup-modal-btn--primary)').addEventListener('click', () => finish(false));
+    overlay.querySelector('.popup-modal-btn--primary').addEventListener('click', () => finish(true));
+    overlay.addEventListener('click', onOverlayClick);
+  });
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 let _instancesCache = {};
@@ -242,10 +318,20 @@ function attachListeners(settings) {
     });
   });
 
-  // Refresh
+  // Refresh All
   document.getElementById('btn-refresh').addEventListener('click', async () => {
     const btn = document.getElementById('btn-refresh');
     const icon = document.getElementById('refresh-icon');
+
+    // If auto-updates are Off, ask for consent before making network calls
+    try {
+      const globalSettings = await sendMessage({ action: 'getGlobalSettings' });
+      if (globalSettings.instanceRefreshIntervalMs === null) {
+        const confirmed = await confirmRefreshAll();
+        if (!confirmed) return;
+      }
+    } catch {/* if getGlobalSettings fails, proceed anyway */}
+
     btn.disabled = true;
     icon?.classList.add('spinning');
     try {

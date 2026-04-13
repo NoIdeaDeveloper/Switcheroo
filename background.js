@@ -24,6 +24,7 @@ import {
   getServiceSettings,
   setServiceSettings,
   getCachedInstances,
+  getInstanceCache,
   isCacheStale,
   getGlobalSettings,
   setGlobalSettings,
@@ -304,6 +305,12 @@ async function handleMessage(message) {
       await Promise.all(services.map(s => fetchInstances(s).catch(() => {})));
       await rotateAllInstances(extensionId);
       return { ok: true };
+    }
+
+    case 'getCacheInfo': {
+      const { serviceId } = message;
+      const cache = await getInstanceCache(serviceId);
+      return { fetchedAt: cache?.fetchedAt ?? null, count: cache?.data?.length ?? 0 };
     }
 
     case 'getInstances': {
