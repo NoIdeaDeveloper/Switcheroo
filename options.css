@@ -236,10 +236,14 @@ html, body {
   grid-template-rows: 1fr;
   transition: grid-template-rows 0.3s ease;
   overflow: hidden;
+  visibility: visible;
 }
 
 .section--collapsed .section-body-wrap {
   grid-template-rows: 0fr;
+  visibility: hidden;
+  /* visibility flips hidden only after the height animation completes */
+  transition: grid-template-rows 0.3s ease, visibility 0s linear 0.3s;
 }
 
 /* The section-body must have min-height:0 for the grid-row collapse to work */

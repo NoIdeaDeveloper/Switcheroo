@@ -416,7 +416,8 @@ function buildFixedPicker(serviceId, svc, instances) {
   // the user navigates away, and there is no rapid-fire scenario to debounce.
   select.addEventListener('change', () => {
     if (select.value) {
-      sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: select.value } })
+      // Include mode: 'fixed' to avoid a race with the debounced mode-button save
+      sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: select.value, mode: 'fixed' } })
         .catch(err => console.error('[Switcheroo] Save failed:', err));
     }
   });
@@ -452,7 +453,8 @@ function buildFixedPicker(serviceId, svc, instances) {
       select.insertBefore(opt, select.options[1]);
     }
     select.value = val;
-    sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: val } })
+    // Include mode: 'fixed' to avoid a race with the debounced mode-button save
+    sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: val, mode: 'fixed' } })
       .catch(err => console.error('[Switcheroo] Save failed:', err));
     input.value = '';
   });

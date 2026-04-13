@@ -25,6 +25,7 @@ import {
   setServiceSettings,
   getCachedInstances,
   getInstanceCache,
+  setInstanceCache,
   isCacheStale,
   getGlobalSettings,
   setGlobalSettings,
@@ -32,6 +33,7 @@ import {
 import {
   getCachedOrFetchInstances,
   fetchInstances,
+  loadFallback,
   resolveCurrentInstance,
 } from './utils/instances.js';
 import { rebuildAllRules, applyRulesForService } from './utils/dnr.js';
@@ -113,6 +115,19 @@ async function fullInit(extensionId) {
  * @param {string} extensionId
  */
 async function lightStartup(extensionId) {
+  const services = getAll();
+
+  // Seed any empty caches from bundled fallback data before rotating.
+  // This handles newly-added services that have never been fetched — without
+  // making any network calls. Once seeded, the stale-cache logic below takes over.
+  await Promise.all(services.map(async service => {
+    const cached = await getCachedInstances(service.id);
+    if (cached.length === 0) {
+      const fallback = await loadFallback(service);
+      if (fallback.length > 0) await setInstanceCache(service.id, fallback);
+    }
+  }));
+
   // Rebuild immediately from whatever's in the cache
   await rotateAllInstances(extensionId);
   registerAlarm();
@@ -121,7 +136,6 @@ async function lightStartup(extensionId) {
   const { instanceRefreshIntervalMs } = await getGlobalSettings();
   if (instanceRefreshIntervalMs === null) return;
 
-  const services = getAll();
   for (const service of services) {
     if (!service.instanceFetcher.url) continue;
     const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);

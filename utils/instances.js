@@ -121,7 +121,7 @@ export function getActiveInstances(allInstances, settings) {
   }
 
   // Filter by user's enabled-instance list (opt-out: empty = all)
-  if (settings.enabledInstances.length > 0) {
+  if ((settings.enabledInstances ?? []).length > 0) {
     const enabled = new Set(settings.enabledInstances);
     pool = pool.filter(inst => enabled.has(inst.url));
   }
