@@ -328,6 +328,16 @@ body {
   flex-shrink: 0;
 }
 
+html[data-theme="dark"] .badge-cf {
+  background: #3A2E10;
+  color: #D4A830;
+  border-color: #6A5020;
+}
+
+/* Error / muted loading states */
+.loading-wrap--error { color: var(--peach-dk); }
+.loading-wrap--muted { color: var(--text-muted); font-size: 12px; }
+
 /* ── Footer ───────────────────────────────────────────────────── */
 
 .footer {

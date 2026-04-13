@@ -140,7 +140,7 @@ async function lightStartup(extensionId) {
     if (!service.instanceFetcher.url) continue;
     const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
     if (stale) {
-      fetchInstances(service).catch(() => {}); // fire-and-forget; alarm will retry
+      fetchInstances(service).catch(err => console.debug('[Switcheroo] fire-and-forget fetch failed:', err)); // alarm will retry
     }
   }
 }
@@ -180,7 +180,7 @@ chrome.alarms.onAlarm.addListener(async alarm => {
         .filter(s => s.instanceFetcher.url)
         .map(async service => {
           const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
-          if (stale) await fetchInstances(service).catch(() => {});
+          if (stale) await fetchInstances(service).catch(err => console.debug('[Switcheroo] stale-cache refresh failed:', err));
         })
     );
   }
@@ -229,6 +229,10 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
       oldSvc.allowCloudflare === newSvc.allowCloudflare;
 
     if (sameEverythingButCurrent) continue;
+
+    // Guard: if the service's settings were removed entirely, skip rather than
+    // passing undefined to buildRules which would throw on settings.enabled.
+    if (!newSvc) continue;
 
     // Something user-visible changed — rebuild rules for this service
     await applyRulesForService(service, extensionId, newSvc);

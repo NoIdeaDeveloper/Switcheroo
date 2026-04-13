@@ -864,8 +864,8 @@ function confirmRefreshAll() {
 
     function onOverlayClick(e) { if (e.target === overlay) finish(false); }
 
-    overlay.querySelector('.btn-modal-cancel').addEventListener('click', () => finish(false));
-    overlay.querySelector('.btn-modal-fetch').addEventListener('click', () => finish(true));
+    cancelBtn.addEventListener('click', () => finish(false));
+    confirmBtn.addEventListener('click', () => finish(true));
     overlay.addEventListener('click', onOverlayClick);
   });
 }
@@ -948,8 +948,8 @@ function confirmNetworkFetch(serviceLabel, fetchUrl) {
 
     function onOverlayClick(e) { if (e.target === overlay) finish(false); }
 
-    overlay.querySelector('.btn-modal-cancel').addEventListener('click', () => finish(false));
-    overlay.querySelector('.btn-modal-fetch').addEventListener('click', () => finish(true));
+    cancelBtn.addEventListener('click', () => finish(false));
+    confirmBtn.addEventListener('click', () => finish(true));
     overlay.addEventListener('click', onOverlayClick);
   });
 }
@@ -1017,7 +1017,7 @@ function confirmPrivacyRisk(flag, instanceUrl) {
     } else {
       title.textContent = 'Instance collects your data';
       body.innerHTML =
-        `This instance has indicated that it <strong>collects user data</strong>. Enabling it means your Medium redirects may be logged by the instance operator.<br><br>` +
+        `This instance has indicated that it <strong>collects user data</strong>. Enabling it means your redirects through this instance may be logged by its operator.<br><br>` +
         `Instance: <span class="modal-instance">${escHtml(instanceUrl.replace('https://', ''))}</span>`;
     }
 
@@ -1039,8 +1039,8 @@ function confirmPrivacyRisk(flag, instanceUrl) {
       if (e.target === overlay) finish(false);
     }
 
-    overlay.querySelector('.btn-modal-cancel').addEventListener('click', () => finish(false));
-    overlay.querySelector('.btn-modal-confirm').addEventListener('click', () => finish(true));
+    cancelBtn.addEventListener('click', () => finish(false));
+    confirmBtn.addEventListener('click', () => finish(true));
     overlay.addEventListener('click', onOverlayClick);
   });
 }

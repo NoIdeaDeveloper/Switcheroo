@@ -229,8 +229,8 @@ function confirmRefreshAll() {
 
     function onOverlayClick(e) { if (e.target === overlay) finish(false); }
 
-    overlay.querySelector('.popup-modal-btn:not(.popup-modal-btn--primary)').addEventListener('click', () => finish(false));
-    overlay.querySelector('.popup-modal-btn--primary').addEventListener('click', () => finish(true));
+    cancelBtn.addEventListener('click', () => finish(false));
+    confirmBtn.addEventListener('click', () => finish(true));
     overlay.addEventListener('click', onOverlayClick);
   });
 }
@@ -255,17 +255,26 @@ async function init() {
       })(),
     ]);
   } catch (err) {
-    container.innerHTML = `<div class="loading-wrap" style="color:var(--peach-dk)">Could not load settings.</div>`;
+    container.innerHTML = `<div class="loading-wrap loading-wrap--error">Could not load settings.</div>`;
     return;
   }
 
   _instancesCache = allInstances;
   container.innerHTML = '';
 
+  let cardsAdded = 0;
   for (const id of Object.keys(SERVICE_META)) {
     if (!settings[id]) continue;
     if (!settings[id].enabled) continue; // disabled services are hidden from the popup
     container.append(buildCard(id, settings[id], allInstances[id] ?? []));
+    cardsAdded++;
+  }
+
+  if (cardsAdded === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'loading-wrap loading-wrap--muted';
+    empty.textContent = 'All redirects are off. Enable one in Settings.';
+    container.append(empty);
   }
 
   attachListeners(settings);

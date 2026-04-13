@@ -91,6 +91,7 @@ export async function loadFallback(service) {
   try {
     const url = chrome.runtime.getURL(service.instanceFetcher.fallbackFile);
     const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const raw = await response.json();
     // Fallback files are already in Instance[] format
     return sanitizeInstanceList(Array.isArray(raw) ? raw : [], service.sourceHosts);
