@@ -5,11 +5,14 @@
  *
  *   6000  medium.com homepage  (priority 2 — beats path catch-all)
  *   6001  medium.com path catch-all  (priority 1)
+ *   6002  *.medium.com subdomain homepage  (priority 2)
+ *   6003  *.medium.com subdomain path catch-all  (priority 1)
  *
  * Scribe mirrors the Medium URL structure exactly, so the redirect simply
  * swaps the host:
  *   medium.com/@user/my-post-09a6af907a2  →  instance/@user/my-post-09a6af907a2
  *   medium.com/topic/technology            →  instance/topic/technology
+ *   user.medium.com/my-post               →  instance/my-post
  *
  * Query strings are discarded to strip tracking parameters.
  *
@@ -24,7 +27,7 @@ export const scribeService = {
   id: 'scribe',
   name: 'Medium',
   description: 'Redirect to Scribe, a privacy-friendly Medium frontend.',
-  sourceHosts: ['medium.com', 'www.medium.com'],
+  sourceHosts: ['medium.com', 'www.medium.com', '*.medium.com'],
   ruleIdStart: 6000,
   ruleIdEnd: 6999,
 
@@ -97,6 +100,24 @@ export const scribeService = {
         priority: 1,
         condition: cond('^https?://(www\\.)?medium\\.com(/[^?#]+)'),
         action: redirect(`${instance}\\2`),
+      },
+
+      // 6002 — *.medium.com subdomain homepage  (priority 2)
+      // Handles user.medium.com without a path.
+      {
+        id: 6002,
+        priority: 2,
+        condition: cond('^https?://[^./]+\\.medium\\.com/?(?:[?#].*)?$'),
+        action: redirect(`${instance}/`),
+      },
+
+      // 6003 — *.medium.com subdomain path catch-all  (priority 1)
+      // Handles user.medium.com/article-slug → instance/article-slug
+      {
+        id: 6003,
+        priority: 1,
+        condition: cond('^https?://[^./]+\\.medium\\.com(/[^?#]+)'),
+        action: redirect(`${instance}\\1`),
       },
     ];
   },

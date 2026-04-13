@@ -24,7 +24,7 @@ export const tiktokService = {
   id: 'tiktok',
   name: 'TikTok',
   description: 'Redirect to ProxiTok, a privacy-friendly TikTok frontend.',
-  sourceHosts: ['tiktok.com', 'www.tiktok.com'],
+  sourceHosts: ['tiktok.com', 'www.tiktok.com', 'm.tiktok.com', 'vm.tiktok.com'],
   ruleIdStart: 5000,
   ruleIdEnd: 5999,
 
@@ -82,19 +82,21 @@ export const tiktokService = {
 
     return [
       // 5000 — TikTok homepage with optional query string / fragment  (priority 2)
+      // Matches tiktok.com, www.tiktok.com, m.tiktok.com, vm.tiktok.com, etc.
       {
         id: 5000,
         priority: 2,
-        condition: cond('^https?://(www\\.)?tiktok\\.com/?(?:[?#].*)?$'),
+        condition: cond('^https?://([a-z0-9]+\\.)?tiktok\\.com/?(?:[?#].*)?$'),
         action: redirect(`${instance}/`),
       },
 
       // 5001 — tiktok.com path catch-all  (priority 1)
       // Captures the path and discards query strings.
+      // Matches any subdomain of tiktok.com.
       {
         id: 5001,
         priority: 1,
-        condition: cond('^https?://(www\\.)?tiktok\\.com(/[^?#]+)'),
+        condition: cond('^https?://([a-z0-9]+\\.)?tiktok\\.com(/[^?#]+)'),
         action: redirect(`${instance}\\2`),
       },
     ];

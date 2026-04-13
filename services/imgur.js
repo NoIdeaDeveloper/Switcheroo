@@ -6,6 +6,7 @@
  *   4000  imgur.com homepage  (priority 2 — beats path catch-all)
  *   4001  imgur.com path catch-all  (priority 1)
  *   4002  i.imgur.com direct image URLs  (priority 1, main_frame + image)
+ *   4003  i.imgur.com homepage  (priority 2)
  *
  * Rimgo URL mapping:
  *   imgur.com/* paths are served at the same path on the rimgo instance.
@@ -115,6 +116,14 @@ export const imgurService = {
         priority: 1,
         condition: cond('^https?://i\\.imgur\\.com(/[^?#]+)', ['main_frame', 'image']),
         action: redirect(`${instance}/media\\1`),
+      },
+
+      // 4003 — i.imgur.com homepage  (priority 2)
+      {
+        id: 4003,
+        priority: 2,
+        condition: cond('^https?://i\\.imgur\\.com/?(?:[?#].*)?$'),
+        action: redirect(`${instance}/`),
       },
     ];
   },
