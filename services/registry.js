@@ -28,8 +28,9 @@
  * @property {string[]} sourceHosts  - hostnames that trigger redirects
  * @property {number}   ruleIdStart  - inclusive start of reserved DNR rule ID range
  * @property {number}   ruleIdEnd    - inclusive end of reserved DNR rule ID range
- * @property {{url: string, cacheTTLMs: number, parse: function, fallbackFile: string}} instanceFetcher
+ * @property {{url: string|null, cacheTTLMs: number, parse: function, fallbackFile: string, responseType?: string, fetchOptions?: RequestInit}} instanceFetcher
  * @property {function(string, ServiceSettings): import('chrome').declarativeNetRequest.Rule[]} buildRules
+ * @property {function(string, string): string|null} transformUrl
  * @property {function(): ServiceSettings} defaultSettings
  */
 

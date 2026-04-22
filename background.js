@@ -136,13 +136,15 @@ async function lightStartup(extensionId) {
   const { instanceRefreshIntervalMs } = await getGlobalSettings();
   if (instanceRefreshIntervalMs === null) return;
 
-  for (const service of services) {
-    if (!service.instanceFetcher.url) continue;
-    const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
-    if (stale) {
-      fetchInstances(service).catch(err => console.debug('[Rooroute] fire-and-forget fetch failed:', err)); // alarm will retry
-    }
-  }
+  await Promise.all(services
+    .filter(s => s.instanceFetcher.url)
+    .map(async service => {
+      const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
+      if (stale) {
+        fetchInstances(service).catch(err => console.debug('[Rooroute] fire-and-forget fetch failed:', err)); // alarm will retry
+      }
+    })
+  );
 }
 
 // ─── Event listeners ──────────────────────────────────────────────────────────
@@ -191,15 +193,15 @@ chrome.alarms.onAlarm.addListener(async alarm => {
   // Rotate only random-mode services whose configured interval has elapsed.
   // Services set to 'startup only' (rotationIntervalMs === 0) are skipped here
   // but are still rotated by lightStartup on browser start.
-  for (const service of services) {
+  await Promise.all(services.map(async service => {
     const settings = await getServiceSettings(service.id);
-    if (settings.mode !== 'random') continue;
+    if (settings.mode !== 'random') return;
     const intervalMs = settings.rotationIntervalMs ?? 3_600_000;
-    if (intervalMs === 0) continue;
+    if (intervalMs === 0) return;
     if (now - (settings.lastRotatedAt ?? 0) >= intervalMs) {
       await rotateInstance(service);
     }
-  }
+  }));
 
   // Rebuild Google Fonts DNR rule — the only service still using DNR.
   await rebuildGoogleFontsRules(extensionId);

@@ -49,24 +49,23 @@ export const scribeService = {
     parse(raw) {
       if (typeof raw !== 'string') return [];
 
-      let urls;
+      // Domains to exclude from both HTML and markdown paths.
+      // Catches sr.ht navigation links in HTML and Tor/I2P addresses in markdown.
+      const SKIP = ['git.sr.ht', 'sr.ht', '.onion', '.i2p', 'man.sr.ht', 'todo.sr.ht'];
+      const keep = url => !SKIP.some(d => url.includes(d));
 
-      if (raw.trimStart().startsWith('<!DOCTYPE') || raw.trimStart().startsWith('<html')) {
-        // SourceHut blob view HTML: instance URLs appear as bare-URL anchor tags
-        // <a href="https://instance.example/">https://instance.example/</a>
-        // Extract href values where the link text is the same URL (bare links).
+      let urls;
+      const trimmed = raw.trimStart();
+      if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
+        // SourceHut blob view HTML — extract href="https://..." anchor attributes.
         urls = [...raw.matchAll(/href="(https:\/\/[^"]+)"/g)]
           .map(m => m[1].replace(/\/$/, ''))
-          .filter(url => {
-            // Keep only non-infrastructure URLs (skip sr.ht nav, etc.)
-            const skip = ['git.sr.ht', 'sr.ht', '.onion', '.i2p', 'man.sr.ht', 'todo.sr.ht'];
-            return !skip.some(d => url.includes(d));
-          });
+          .filter(keep);
       } else {
         // Raw markdown: bare links formatted as <https://instance.example/>
         urls = [...raw.matchAll(/<(https:\/\/[^\s>]+)>/g)]
           .map(m => m[1].replace(/\/$/, ''))
-          .filter(url => !url.includes('.onion') && !url.includes('.i2p'));
+          .filter(keep);
       }
 
       return urls.map(url => ({ url, cloudflare: false, collectsData: false }));

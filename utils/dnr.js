@@ -19,7 +19,7 @@
  */
 
 import { getAll, getById } from '../services/registry.js';
-import { getSettings, getServiceSettings, getCachedInstances } from './storage.js';
+import { getServiceSettings, getCachedInstances } from './storage.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -85,36 +85,6 @@ export async function applyRulesForService(service, extensionId, serviceSettings
 }
 
 /**
- * Rebuilds DNR rules for ALL services using current storage settings.
- * Called on startup and after instance rotation.
- *
- * @param {string} extensionId
- */
-export async function rebuildAllRules(extensionId) {
-  const services = getAll();
-  const settings = await getSettings();
-  const excludedInitiatorDomains = await computeExcludedDomains();
-
-  const existingIds = await getExistingRuleIds();
-  const removeRuleIds = [...existingIds];
-
-  const addRules = [];
-  for (const service of services) {
-    const serviceSettings = settings[service.id];
-    if (!serviceSettings) continue;
-    const rules = service.buildRules(extensionId, serviceSettings, excludedInitiatorDomains);
-    addRules.push(...rules);
-  }
-
-  try {
-    await chrome.declarativeNetRequest.updateDynamicRules({ addRules, removeRuleIds });
-  } catch (err) {
-    console.error('[Rooroute] Failed to rebuild all DNR rules:', err);
-    throw err;
-  }
-}
-
-/**
  * Rebuilds DNR rules for the Google Fonts service only.
  * All other services use content scripts for redirection.
  * Called on startup, install, and when Google Fonts settings change.
@@ -124,23 +94,9 @@ export async function rebuildAllRules(extensionId) {
 export async function rebuildGoogleFontsRules(extensionId) {
   const service = getById('googlefonts');
   if (!service) return;
-
   const serviceSettings = await getServiceSettings('googlefonts');
   if (!serviceSettings) return;
-
-  const existingIds = await getExistingRuleIds();
-  const removeRuleIds = existingIds.filter(
-    id => id >= service.ruleIdStart && id <= service.ruleIdEnd
-  );
-
-  const excludedInitiatorDomains = await computeExcludedDomains();
-  const addRules = service.buildRules(extensionId, serviceSettings, excludedInitiatorDomains);
-
-  try {
-    await chrome.declarativeNetRequest.updateDynamicRules({ addRules, removeRuleIds });
-  } catch (err) {
-    console.error('[Rooroute] Failed to update Google Fonts DNR rules:', err);
-  }
+  await applyRulesForService(service, extensionId, serviceSettings);
 }
 
 /**
