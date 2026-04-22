@@ -119,6 +119,38 @@ export const redditService = {
   },
 
   /**
+   * Transforms a Reddit URL to a Redlib instance URL.
+   * Returns null if the URL doesn't match.
+   *
+   * @param {string} href
+   * @param {string} instance
+   * @returns {string|null}
+   */
+  transformUrl(href, instance) {
+    let url;
+    try { url = new URL(href); } catch { return null; }
+
+    const host = url.hostname.replace(/^www\./, '');
+    if (host !== 'reddit.com' && host !== 'old.reddit.com') return null;
+
+    // Homepage
+    if (url.pathname === '/' || url.pathname === '') {
+      return `${instance}/`;
+    }
+
+    // Search: preserve q param, strip everything else
+    if (url.pathname === '/search') {
+      const q = url.searchParams.get('q');
+      if (q) return `${instance}/search?q=${encodeURIComponent(q)}`;
+      return `${instance}/search`;
+    }
+
+    // All other paths: forward path only, strip query/hash
+    const path = url.pathname.replace(/\/+$/, '') || '/';
+    return `${instance}${path}`;
+  },
+
+  /**
    * Returns the default settings for this service on first install.
    * @returns {import('./registry.js').ServiceSettings}
    */

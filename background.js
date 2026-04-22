@@ -1,5 +1,5 @@
 /**
- * background.js — Switcheroo service worker
+ * background.js — Rooroute service worker
  *
  * Responsibilities:
  *   1. On install: initialise storage defaults, fetch instances, build DNR rules
@@ -36,7 +36,7 @@ import {
   loadFallback,
   resolveCurrentInstance,
 } from './utils/instances.js';
-import { rebuildAllRules, applyRulesForService } from './utils/dnr.js';
+import { rebuildGoogleFontsRules, applyRulesForService, removeAllRules } from './utils/dnr.js';
 
 const ALARM_NAME = 'instanceRefresh';
 // 1-minute tick so sub-hour rotation intervals fire accurately.
@@ -74,7 +74,7 @@ async function rotateInstance(service) {
 async function rotateAllInstances(extensionId) {
   const services = getAll();
   await Promise.all(services.map(s => rotateInstance(s)));
-  await rebuildAllRules(extensionId);
+  await rebuildGoogleFontsRules(extensionId);
 }
 
 // ─── Startup & install ────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ async function lightStartup(extensionId) {
     if (!service.instanceFetcher.url) continue;
     const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
     if (stale) {
-      fetchInstances(service).catch(err => console.debug('[Switcheroo] fire-and-forget fetch failed:', err)); // alarm will retry
+      fetchInstances(service).catch(err => console.debug('[Rooroute] fire-and-forget fetch failed:', err)); // alarm will retry
     }
   }
 }
@@ -157,6 +157,9 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
     // Merge any new service defaults without overwriting existing settings
     const services = getAll();
     await initializeDefaults(services);
+    // Clear any stale DNR rules from previous versions (which used DNR for all services).
+    // rebuildGoogleFontsRules called inside lightStartup will re-add the only rule we still need.
+    await removeAllRules(extensionId);
     await lightStartup(extensionId);
   }
 });
@@ -180,7 +183,7 @@ chrome.alarms.onAlarm.addListener(async alarm => {
         .filter(s => s.instanceFetcher.url)
         .map(async service => {
           const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
-          if (stale) await fetchInstances(service).catch(err => console.debug('[Switcheroo] stale-cache refresh failed:', err));
+          if (stale) await fetchInstances(service).catch(err => console.debug('[Rooroute] stale-cache refresh failed:', err));
         })
     );
   }
@@ -198,8 +201,8 @@ chrome.alarms.onAlarm.addListener(async alarm => {
     }
   }
 
-  // Rebuild rules — instance lists may have changed even without rotation.
-  await rebuildAllRules(extensionId);
+  // Rebuild Google Fonts DNR rule — the only service still using DNR.
+  await rebuildGoogleFontsRules(extensionId);
 });
 
 chrome.storage.onChanged.addListener(async (changes, area) => {
@@ -218,23 +221,13 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 
     if (JSON.stringify(oldSvc) === JSON.stringify(newSvc)) continue;
 
-    // If currentInstance changed as a result of our own write, skip rebuilding
-    // (rebuildAllRules was already called by rotateInstance flow)
-    const sameEverythingButCurrent =
-      oldSvc && newSvc &&
-      oldSvc.enabled === newSvc.enabled &&
-      oldSvc.mode === newSvc.mode &&
-      oldSvc.fixedInstance === newSvc.fixedInstance &&
-      JSON.stringify(oldSvc.enabledInstances) === JSON.stringify(newSvc.enabledInstances) &&
-      oldSvc.allowCloudflare === newSvc.allowCloudflare;
+    // Only Google Fonts uses DNR — skip all other services.
+    if (service.id !== 'googlefonts') continue;
 
-    if (sameEverythingButCurrent) continue;
-
-    // Guard: if the service's settings were removed entirely, skip rather than
-    // passing undefined to buildRules which would throw on settings.enabled.
+    // Guard: if the service's settings were removed entirely, skip.
     if (!newSvc) continue;
 
-    // Something user-visible changed — rebuild rules for this service
+    // Something user-visible changed — rebuild Google Fonts DNR rule.
     await applyRulesForService(service, extensionId, newSvc);
   }
 });
@@ -246,7 +239,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return false;
 
   handleMessage(message).then(sendResponse).catch(err => {
-    console.error('[Switcheroo] Message handler error:', err);
+    console.error('[Rooroute] Message handler error:', err);
     sendResponse({ error: err.message });
   });
 
@@ -303,7 +296,10 @@ async function handleMessage(message) {
       }
 
       await setServiceSettings(serviceId, merged);
-      await applyRulesForService(service, extensionId, merged);
+      // Only Google Fonts uses DNR; content scripts handle all other services.
+      if (service.id === 'googlefonts') {
+        await applyRulesForService(service, extensionId, merged);
+      }
       return { ok: true };
     }
 
@@ -314,7 +310,9 @@ async function handleMessage(message) {
 
       const instances = await fetchInstances(service);
       if (instances) await rotateInstance(service);
-      await applyRulesForService(service, extensionId, await getServiceSettings(serviceId));
+      if (service.id === 'googlefonts') {
+        await applyRulesForService(service, extensionId, await getServiceSettings(serviceId));
+      }
       return { ok: true, count: instances?.length ?? 0 };
     }
 

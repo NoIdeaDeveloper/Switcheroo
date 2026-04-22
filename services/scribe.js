@@ -32,26 +32,44 @@ export const scribeService = {
   ruleIdEnd: 6999,
 
   instanceFetcher: {
+    // The blob view URL returns an HTML page, not raw markdown. Sending
+    // Accept: text/plain causes SourceHut to respond with the raw file content.
     url: 'https://git.sr.ht/~edwardloveall/scribe/blob/main/docs/instances.md',
+    fetchOptions: { headers: { 'Accept': 'text/plain' } },
     responseType: 'text',
     cacheTTLMs: 86_400_000, // 24 hours — the list changes infrequently
 
     /**
-     * Parses the instances.md markdown into a normalised Instance array.
-     * Extracts bare <https://...> links; skips Tor and I2P entries.
-     * @param {string} raw - raw markdown text
+     * Parses the instances.md content into a normalised Instance array.
+     * Handles both raw markdown (from Accept: text/plain) and the SourceHut
+     * HTML blob view (fallback if the server ignores the Accept header).
+     * @param {string} raw - raw markdown or HTML
      * @returns {import('./registry.js').Instance[]}
      */
     parse(raw) {
       if (typeof raw !== 'string') return [];
-      return [...raw.matchAll(/<(https:\/\/[^\s>]+)>/g)]
-        .map(m => m[1].replace(/\/$/, ''))
-        .filter(url => !url.includes('.onion') && !url.includes('.i2p'))
-        .map(url => ({
-          url,
-          cloudflare: false,
-          collectsData: false,
-        }));
+
+      let urls;
+
+      if (raw.trimStart().startsWith('<!DOCTYPE') || raw.trimStart().startsWith('<html')) {
+        // SourceHut blob view HTML: instance URLs appear as bare-URL anchor tags
+        // <a href="https://instance.example/">https://instance.example/</a>
+        // Extract href values where the link text is the same URL (bare links).
+        urls = [...raw.matchAll(/href="(https:\/\/[^"]+)"/g)]
+          .map(m => m[1].replace(/\/$/, ''))
+          .filter(url => {
+            // Keep only non-infrastructure URLs (skip sr.ht nav, etc.)
+            const skip = ['git.sr.ht', 'sr.ht', '.onion', '.i2p', 'man.sr.ht', 'todo.sr.ht'];
+            return !skip.some(d => url.includes(d));
+          });
+      } else {
+        // Raw markdown: bare links formatted as <https://instance.example/>
+        urls = [...raw.matchAll(/<(https:\/\/[^\s>]+)>/g)]
+          .map(m => m[1].replace(/\/$/, ''))
+          .filter(url => !url.includes('.onion') && !url.includes('.i2p'));
+      }
+
+      return urls.map(url => ({ url, cloudflare: false, collectsData: false }));
     },
 
     fallbackFile: 'data/scribe-fallback.json',
@@ -120,6 +138,36 @@ export const scribeService = {
         action: redirect(`${instance}\\1`),
       },
     ];
+  },
+
+  /**
+   * Transforms a medium.com URL to a Scribe instance URL.
+   * Returns null if the URL doesn't match.
+   *
+   * @param {string} href
+   * @param {string} instance
+   * @returns {string|null}
+   */
+  transformUrl(href, instance) {
+    let url;
+    try { url = new URL(href); } catch { return null; }
+
+    const host = url.hostname.replace(/^www\./, '');
+
+    // Subdomains like user.medium.com — forward the path to the instance
+    if (host.endsWith('.medium.com') && host !== 'medium.com') {
+      if (url.pathname === '/' || url.pathname === '') return `${instance}/`;
+      const path = url.pathname.replace(/\/+$/, '') || '/';
+      return `${instance}${path}`;
+    }
+
+    if (host !== 'medium.com') return null;
+
+    if (url.pathname === '/' || url.pathname === '') return `${instance}/`;
+
+    // Forward path only, strip query/hash (removes UTM tracking params)
+    const path = url.pathname.replace(/\/+$/, '') || '/';
+    return `${instance}${path}`;
   },
 
   /**

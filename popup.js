@@ -1,5 +1,5 @@
 /**
- * popup.js — Switcheroo toolbar popup
+ * popup.js — Rooroute toolbar popup
  * No network requests. All data flows through sendMessage → background.
  */
 

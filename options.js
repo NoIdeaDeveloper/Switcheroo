@@ -1,5 +1,5 @@
 /**
- * options.js — Switcheroo full settings page.
+ * options.js — Rooroute full settings page.
  * No network requests. All data flows through sendMessage → background.
  */
 
@@ -54,7 +54,7 @@ function debounce(fn, ms) {
 
 const debouncedSave = debounce(async (serviceId, patch) => {
   try { await sendMessage({ action: 'setServiceSettings', serviceId, settings: patch }); }
-  catch (err) { console.error('[Switcheroo] Save failed:', err); }
+  catch (err) { console.error('[Rooroute] Save failed:', err); }
 }, 350);
 
 // ─── Global settings card ─────────────────────────────────────────────────────
@@ -110,13 +110,13 @@ function buildGlobalSection(globalSettings) {
     const raw = select.value;
     const value = raw === 'null' ? null : Number(raw);
     sendMessage({ action: 'setGlobalSettings', settings: { instanceRefreshIntervalMs: value } })
-      .catch(err => console.error('[Switcheroo] setGlobalSettings failed:', err));
+      .catch(err => console.error('[Rooroute] setGlobalSettings failed:', err));
   });
 
   const hint = document.createElement('p');
   hint.className = 'global-setting-hint';
   hint.textContent =
-    'How often Switcheroo fetches updated instance lists from their sources. ' +
+    'How often Rooroute fetches updated instance lists from their sources. ' +
     'Set to Off to disable all automatic network calls — you can still refresh ' +
     'each list manually using the Refresh button in each service section.';
 
@@ -157,7 +157,7 @@ function buildGlobalSection(globalSettings) {
     const dark = dmInput.checked;
     document.documentElement.dataset.theme = dark ? 'dark' : '';
     sendMessage({ action: 'setGlobalSettings', settings: { darkMode: dark } })
-      .catch(err => console.error('[Switcheroo] setGlobalSettings failed:', err));
+      .catch(err => console.error('[Rooroute] setGlobalSettings failed:', err));
   });
 
   dmRow.append(dmToggleLabel, dmText);
@@ -418,7 +418,7 @@ function buildFixedPicker(serviceId, svc, instances) {
     if (select.value) {
       // Include mode: 'fixed' to avoid a race with the debounced mode-button save
       sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: select.value, mode: 'fixed' } })
-        .catch(err => console.error('[Switcheroo] Save failed:', err));
+        .catch(err => console.error('[Rooroute] Save failed:', err));
     }
   });
 
@@ -455,7 +455,7 @@ function buildFixedPicker(serviceId, svc, instances) {
     select.value = val;
     // Include mode: 'fixed' to avoid a race with the debounced mode-button save
     sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: val, mode: 'fixed' } })
-      .catch(err => console.error('[Switcheroo] Save failed:', err));
+      .catch(err => console.error('[Rooroute] Save failed:', err));
     input.value = '';
   });
 
@@ -928,7 +928,7 @@ function confirmNetworkFetch(serviceLabel, fetchUrl) {
       `Refreshing the <strong>${escHtml(serviceLabel)}</strong> instance list requires a network request to:<br><br>` +
       `<code class="fetch-url">${escHtml(fetchUrl)}</code><br><br>` +
       `This request will reveal to <strong>${escHtml(hostname)}</strong> that you have ` +
-      `Switcheroo installed (your IP address and browser User-Agent will be visible). ` +
+      `Rooroute installed (your IP address and browser User-Agent will be visible). ` +
       `No browsing history or redirect activity is included.<br><br>` +
       `You can enable automatic updates in the <strong>Instance Lists</strong> section above ` +
       `to avoid this prompt in the future.`;

@@ -18,8 +18,8 @@
  *     interception at the browser level.
  */
 
-import { getAll } from '../services/registry.js';
-import { getSettings, getCachedInstances } from './storage.js';
+import { getAll, getById } from '../services/registry.js';
+import { getSettings, getServiceSettings, getCachedInstances } from './storage.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ export async function applyRulesForService(service, extensionId, serviceSettings
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({ addRules, removeRuleIds });
   } catch (err) {
-    console.error(`[Switcheroo] Failed to update DNR rules for ${service.id}:`, err);
+    console.error(`[Rooroute] Failed to update DNR rules for ${service.id}:`, err);
     throw err;
   }
 }
@@ -109,13 +109,42 @@ export async function rebuildAllRules(extensionId) {
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({ addRules, removeRuleIds });
   } catch (err) {
-    console.error('[Switcheroo] Failed to rebuild all DNR rules:', err);
+    console.error('[Rooroute] Failed to rebuild all DNR rules:', err);
     throw err;
   }
 }
 
 /**
- * Removes all DNR rules managed by Switcheroo.
+ * Rebuilds DNR rules for the Google Fonts service only.
+ * All other services use content scripts for redirection.
+ * Called on startup, install, and when Google Fonts settings change.
+ *
+ * @param {string} extensionId
+ */
+export async function rebuildGoogleFontsRules(extensionId) {
+  const service = getById('googlefonts');
+  if (!service) return;
+
+  const serviceSettings = await getServiceSettings('googlefonts');
+  if (!serviceSettings) return;
+
+  const existingIds = await getExistingRuleIds();
+  const removeRuleIds = existingIds.filter(
+    id => id >= service.ruleIdStart && id <= service.ruleIdEnd
+  );
+
+  const excludedInitiatorDomains = await computeExcludedDomains();
+  const addRules = service.buildRules(extensionId, serviceSettings, excludedInitiatorDomains);
+
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({ addRules, removeRuleIds });
+  } catch (err) {
+    console.error('[Rooroute] Failed to update Google Fonts DNR rules:', err);
+  }
+}
+
+/**
+ * Removes all DNR rules managed by Rooroute.
  * Used when the extension is disabled or during cleanup.
  *
  * @param {string} extensionId

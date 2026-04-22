@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Switcheroo Settings</title>
+  <title>Rooroute Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <!-- ── Page header ──────────────────────────────────── -->
   <header class="page-header">
     <div class="page-header-inner">
-      <img src="icons/icon48.png" alt="Switcheroo" class="page-icon" width="40" height="40">
+      <img src="icons/icon48.png" alt="Rooroute" class="page-icon" width="40" height="40">
       <div>
-        <h1 class="page-title">Switcheroo Settings</h1>
+        <h1 class="page-title">Rooroute Settings</h1>
         <p class="page-subtitle">Hop, redirect, repeat.</p>
       </div>
     </div>
@@ -31,15 +31,15 @@
       </div>
       <div class="section-body privacy-section">
         <p>
-          Switcheroo is built with your privacy as the top priority. Here's
+          Rooroute is built with your privacy as the top priority. Here's
           exactly what this extension does and doesn't do:
         </p>
         <ul>
           <li>
-            <strong>No browsing data collected.</strong> Switcheroo uses the
-            browser's Declarative Net Request API, which handles redirects at
-            the browser level. The extension code never sees which YouTube
-            videos or Reddit posts you visit.
+            <strong>No browsing data collected.</strong> Rooroute uses
+            content scripts that redirect at navigation time and never log,
+            store, or transmit the URLs you visit. Google Fonts redirects use
+            the browser's Declarative Net Request API at the network level.
           </li>
           <li>
             <strong>No analytics or telemetry.</strong> Zero usage data is
@@ -62,7 +62,7 @@
               <li><code>https://raw.githubusercontent.com/pablouser1/ProxiTok/…/instances.json</code> — TikTok (ProxiTok)</li>
               <li><code>https://git.sr.ht/~edwardloveall/scribe/blob/main/docs/instances.md</code> — Medium (Scribe)</li>
             </ul>
-            Each request reveals to that server that you have Switcheroo
+            Each request reveals to that server that you have Rooroute
             installed (your IP address and User-Agent are visible). No browsing
             history or redirect activity is included. Set the auto-update
             interval to <strong>Off</strong> to make zero automatic network
@@ -80,7 +80,7 @@
           </li>
         </ul>
         <p class="source-link">
-          Switcheroo is open source.
+          Rooroute is open source.
           <a href="https://github.com/jeffgoldblum/switcheroo" target="_blank" rel="noopener noreferrer">
             View source on GitHub ↗
           </a>

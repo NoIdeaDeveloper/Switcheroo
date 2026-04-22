@@ -103,6 +103,28 @@ export const tiktokService = {
   },
 
   /**
+   * Transforms a TikTok URL to a ProxiTok instance URL.
+   * Returns null if the URL doesn't match.
+   *
+   * @param {string} href
+   * @param {string} instance
+   * @returns {string|null}
+   */
+  transformUrl(href, instance) {
+    let url;
+    try { url = new URL(href); } catch { return null; }
+
+    const host = url.hostname;
+    if (!host.endsWith('.tiktok.com') && host !== 'tiktok.com') return null;
+
+    if (url.pathname === '/' || url.pathname === '') return `${instance}/`;
+
+    // Forward path only, strip query/hash (removes tracking params)
+    const path = url.pathname.replace(/\/+$/, '') || '/';
+    return `${instance}${path}`;
+  },
+
+  /**
    * Returns the default settings for this service on first install.
    * @returns {import('./registry.js').ServiceSettings}
    */
