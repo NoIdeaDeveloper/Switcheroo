@@ -50,14 +50,6 @@ export async function setServiceSettings(serviceId, patch) {
 }
 
 /**
- * Overwrites the entire settings object.
- * @param {object} settings
- */
-export async function setSettings(settings) {
-  await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
-}
-
-/**
  * Initialises default settings for all services without overwriting
  * existing values. Safe to call on every install/update.
  * @param {import('../services/registry.js').ServiceDefinition[]} services
@@ -139,6 +131,21 @@ export async function setInstanceCache(serviceId, instances) {
 export async function getCachedInstances(serviceId) {
   const cache = await getInstanceCache(serviceId);
   return cache?.data ?? [];
+}
+
+/**
+ * Returns all cached instance data in a single storage read.
+ * More efficient than calling getCachedInstances() in a loop.
+ * @returns {Promise<Map<string, object[]>>}
+ */
+export async function getAllCachedInstances() {
+  const result = await chrome.storage.local.get(INSTANCE_CACHE_KEY);
+  const cache = result[INSTANCE_CACHE_KEY] ?? {};
+  const map = new Map();
+  for (const [serviceId, entry] of Object.entries(cache)) {
+    map.set(serviceId, entry?.data ?? []);
+  }
+  return map;
 }
 
 /**

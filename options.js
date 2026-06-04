@@ -3,47 +3,46 @@
  * No network requests. All data flows through sendMessage → background.
  */
 
+import { escHtml, sendMessage } from './utils/ui.js';
+import { validateUserInstanceUrl } from './utils/validate.js';
+
 // Apply dark mode from storage immediately to minimise flash before init() runs.
 chrome.storage.local.get('globalSettings', result => {
   if (result.globalSettings?.darkMode) document.documentElement.dataset.theme = 'dark';
 });
 
-function sendMessage(message) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(message, response => {
-      if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
-      if (response?.error) return reject(new Error(response.error));
-      resolve(response);
-    });
-  });
-}
-
 const SERVICE_META = {
   youtube: {
     label: 'YouTube', target: 'Invidious',
     fetchUrl: 'https://api.invidious.io/instances.json?sort_by=type,users',
+    sourceHosts: ['youtube.com', 'www.youtube.com', 'youtu.be', 'www.youtube-nocookie.com'],
   },
   reddit: {
     label: 'Reddit', target: 'Redlib',
     fetchUrl: 'https://raw.githubusercontent.com/redlib-org/redlib-instances/refs/heads/main/instances.json',
+    sourceHosts: ['reddit.com', 'www.reddit.com', 'old.reddit.com'],
   },
   googlefonts: {
     label: 'Google Fonts', target: 'Bunny Fonts',
     staticRedirect: true,
     fetchUrl: null,
     description: 'Redirects Google Fonts to fonts.bunny.net — a privacy-friendly, GDPR-compliant CDN. No Google tracking. Works for every font.',
+    sourceHosts: ['fonts.googleapis.com', 'fonts.gstatic.com'],
   },
   imgur: {
     label: 'Imgur', target: 'Rimgo',
     fetchUrl: 'https://rimgo.codeberg.page/api.json',
+    sourceHosts: ['imgur.com', 'www.imgur.com', 'i.imgur.com'],
   },
   tiktok: {
     label: 'TikTok', target: 'ProxiTok',
     fetchUrl: 'https://raw.githubusercontent.com/pablouser1/ProxiTok/refs/heads/master/instances.json',
+    sourceHosts: ['tiktok.com', 'www.tiktok.com', 'm.tiktok.com', 'vm.tiktok.com'],
   },
   scribe: {
     label: 'Medium', target: 'Scribe',
     fetchUrl: 'https://git.sr.ht/~edwardloveall/scribe/blob/main/docs/instances.md',
+    sourceHosts: ['medium.com', 'www.medium.com'],
   },
 };
 
@@ -189,14 +188,17 @@ function buildGlobalSection(globalSettings) {
     refreshAllBtn.querySelector('svg')?.classList.add('spinning');
     try {
       await sendMessage({ action: 'refreshAllInstances' });
+      // Fetch settings once for all services
+      const freshSettings = await sendMessage({ action: 'getSettings' });
       // Update each service's last-fetched indicator
-      for (const id of Object.keys(SERVICE_META)) {
-        if (SERVICE_META[id].staticRedirect) continue;
+      await Promise.all(Object.keys(SERVICE_META).map(async id => {
+        if (SERVICE_META[id].staticRedirect) return;
         const fetchedEl = document.getElementById(`last-fetched-${id}`);
         if (fetchedEl) fetchedEl.textContent = 'Fetched: just now';
-        const cacheInfo = await sendMessage({ action: 'getCacheInfo', serviceId: id });
-        const freshInstances = await sendMessage({ action: 'getInstances', serviceId: id });
-        const freshSettings  = await sendMessage({ action: 'getSettings' });
+        const [cacheInfo, freshInstances] = await Promise.all([
+          sendMessage({ action: 'getCacheInfo', serviceId: id }),
+          sendMessage({ action: 'getInstances', serviceId: id }),
+        ]);
         const oldList = document.getElementById(`list-${id}`);
         if (oldList) {
           const newList = buildInstanceRows(id, freshSettings[id], freshInstances ?? []);
@@ -205,7 +207,7 @@ function buildGlobalSection(globalSettings) {
         }
         const countEl = document.getElementById(`instance-count-${id}`);
         if (countEl) countEl.textContent = `${cacheInfo.count} instance${cacheInfo.count !== 1 ? 's' : ''}`;
-      }
+      }));
     } catch (err) { console.error(err); }
     finally {
       refreshAllBtn.disabled = false;
@@ -445,16 +447,17 @@ function buildFixedPicker(serviceId, svc, instances) {
   useBtn.textContent = 'Use';
 
   useBtn.addEventListener('click', () => {
-    const val = input.value.trim();
-    if (!val.startsWith('https://')) { input.classList.add('invalid'); return; }
+    const sourceHosts = SERVICE_META[serviceId]?.sourceHosts ?? [];
+    const normalized = validateUserInstanceUrl(input.value.trim(), sourceHosts);
+    if (!normalized) { input.classList.add('invalid'); return; }
     input.classList.remove('invalid');
-    if (!Array.from(select.options).some(o => o.value === val)) {
-      const opt = new Option(val.replace('https://', ''), val);
+    if (!Array.from(select.options).some(o => o.value === normalized)) {
+      const opt = new Option(normalized.replace('https://', ''), normalized);
       select.insertBefore(opt, select.options[1]);
     }
-    select.value = val;
+    select.value = normalized;
     // Include mode: 'fixed' to avoid a race with the debounced mode-button save
-    sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: val, mode: 'fixed' } })
+    sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: normalized, mode: 'fixed' } })
       .catch(err => console.error('[Rooroute] Save failed:', err));
     input.value = '';
   });
@@ -724,21 +727,21 @@ function buildRow(serviceId, svc, inst, flag) {
 const pendingEnabled = {};
 
 async function updateEnabled(serviceId, url, enabled) {
-  const settings = await sendMessage({ action: 'getSettings' });
-  const svc = settings[serviceId] ?? {};
-  let list = [...(svc.enabledInstances ?? [])];
-
-  if (list.length === 0) {
-    // Materialise the "all enabled" implicit state
-    const all = await sendMessage({ action: 'getInstances', serviceId });
-    list = (all ?? []).map(i => i.url);
-  }
-
-  if (enabled) { if (!list.includes(url)) list.push(url); }
-  else { list = list.filter(u => u !== url); }
-
   clearTimeout(pendingEnabled[serviceId]);
-  pendingEnabled[serviceId] = setTimeout(() => {
+  pendingEnabled[serviceId] = setTimeout(async () => {
+    const settings = await sendMessage({ action: 'getSettings' });
+    const svc = settings[serviceId] ?? {};
+    let list = [...(svc.enabledInstances ?? [])];
+
+    if (list.length === 0) {
+      // Materialise the "all enabled" implicit state
+      const all = await sendMessage({ action: 'getInstances', serviceId });
+      list = (all ?? []).map(i => i.url);
+    }
+
+    if (enabled) { if (!list.includes(url)) list.push(url); }
+    else { list = list.filter(u => u !== url); }
+
     sendMessage({ action: 'setServiceSettings', serviceId, settings: { enabledInstances: list } })
       .catch(console.error);
   }, 350);
@@ -770,13 +773,10 @@ function countryFlag(code) {
   return [...code.toUpperCase()].map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('');
 }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
 function formatRelativeTime(ts) {
   if (!ts) return 'Never';
   const diff = Date.now() - ts;
+  if (diff < 0) return 'Just now';
   const secs = Math.floor(diff / 1000);
   if (secs < 60) return 'Just now';
   const mins = Math.floor(secs / 60);

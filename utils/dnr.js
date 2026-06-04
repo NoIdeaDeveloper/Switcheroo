@@ -18,8 +18,8 @@
  *     interception at the browser level.
  */
 
-import { getAll, getById } from '../services/registry.js';
-import { getServiceSettings, getCachedInstances } from './storage.js';
+import { getById } from '../services/registry.js';
+import { getServiceSettings, getAllCachedInstances } from './storage.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,11 +40,10 @@ async function getExistingRuleIds() {
  * @returns {Promise<string[]>}
  */
 async function computeExcludedDomains() {
-  const services = getAll();
+  const allInstances = await getAllCachedInstances();
   const hostnames = new Set();
 
-  for (const service of services) {
-    const instances = await getCachedInstances(service.id);
+  for (const instances of allInstances.values()) {
     for (const inst of instances) {
       try {
         hostnames.add(new URL(inst.url).hostname);

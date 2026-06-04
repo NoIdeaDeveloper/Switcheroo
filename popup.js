@@ -3,20 +3,12 @@
  * No network requests. All data flows through sendMessage → background.
  */
 
+import { escHtml, sendMessage } from './utils/ui.js';
+
 // Apply dark mode from storage immediately to minimise flash before init() runs.
 chrome.storage.local.get('globalSettings', result => {
   if (result.globalSettings?.darkMode) document.documentElement.dataset.theme = 'dark';
 });
-
-function sendMessage(message) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(message, response => {
-      if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
-      if (response?.error) return reject(new Error(response.error));
-      resolve(response);
-    });
-  });
-}
 
 const SERVICE_META = {
   youtube:     { label: 'YouTube',      target: 'Invidious',   accentColor: '#FFBA93', fetchUrl: 'https://api.invidious.io/instances.json?sort_by=type,users' },
@@ -140,11 +132,7 @@ function buildStatusRow(serviceId, settings, instances) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function hostOnly(url) {
-  try { return new URL(url).hostname; } catch { return url; }
-}
-
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  try { return new URL(url).hostname; } catch { return url ?? ''; }
 }
 
 function countActive(instances, settings) {
@@ -237,8 +225,6 @@ function confirmRefreshAll() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-let _instancesCache = {};
-
 async function init() {
   const container = document.getElementById('services');
 
@@ -259,7 +245,6 @@ async function init() {
     return;
   }
 
-  _instancesCache = allInstances;
   container.innerHTML = '';
 
   let cardsAdded = 0;
@@ -326,37 +311,36 @@ function attachListeners(settings) {
       chrome.runtime.openOptionsPage();
     });
   });
-
-  // Refresh All
-  document.getElementById('btn-refresh').addEventListener('click', async () => {
-    const btn = document.getElementById('btn-refresh');
-    const icon = document.getElementById('refresh-icon');
-
-    // If auto-updates are Off, ask for consent before making network calls
-    try {
-      const globalSettings = await sendMessage({ action: 'getGlobalSettings' });
-      if (globalSettings.instanceRefreshIntervalMs === null) {
-        const confirmed = await confirmRefreshAll();
-        if (!confirmed) return;
-      }
-    } catch {/* if getGlobalSettings fails, proceed anyway */}
-
-    btn.disabled = true;
-    icon?.classList.add('spinning');
-    try {
-      await sendMessage({ action: 'refreshAllInstances' });
-      await init();
-    } catch {/* swallow */} finally {
-      btn.disabled = false;
-      icon?.classList.remove('spinning');
-    }
-  });
-
-  // Open settings page
-  document.getElementById('btn-settings').addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-  });
 }
+
+// Persistent footer listeners — registered once, survive init() re-renders
+document.getElementById('btn-refresh').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-refresh');
+  const icon = document.getElementById('refresh-icon');
+
+  // If auto-updates are Off, ask for consent before making network calls
+  try {
+    const globalSettings = await sendMessage({ action: 'getGlobalSettings' });
+    if (globalSettings.instanceRefreshIntervalMs === null) {
+      const confirmed = await confirmRefreshAll();
+      if (!confirmed) return;
+    }
+  } catch {/* if getGlobalSettings fails, proceed anyway */}
+
+  btn.disabled = true;
+  icon?.classList.add('spinning');
+  try {
+    await sendMessage({ action: 'refreshAllInstances' });
+    await init();
+  } catch {/* swallow */} finally {
+    btn.disabled = false;
+    icon?.classList.remove('spinning');
+  }
+});
+
+document.getElementById('btn-settings').addEventListener('click', () => {
+  chrome.runtime.openOptionsPage();
+});
 
 
 init();

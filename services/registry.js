@@ -66,12 +66,3 @@ export function getAll() {
 export function getById(id) {
   return SERVICES.find(s => s.id === id);
 }
-
-/**
- * Returns the initial settings object for all services.
- * Suitable for use as the default storage value on first install.
- * @returns {object}
- */
-export function getDefaultSettings() {
-  return Object.fromEntries(SERVICES.map(s => [s.id, s.defaultSettings()]));
-}

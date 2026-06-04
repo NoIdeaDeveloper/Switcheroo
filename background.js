@@ -54,7 +54,7 @@ const ALARM_PERIOD_MINUTES = 1;
  * @returns {Promise<string|null>}
  */
 async function rotateInstance(service) {
-  const settings = await getServiceSettings(service.id);
+  const settings = await getServiceSettings(service.id) ?? {};
   const instances = await getCachedInstances(service.id);
 
   const chosen = resolveCurrentInstance(service, settings, instances);
@@ -193,8 +193,9 @@ chrome.alarms.onAlarm.addListener(async alarm => {
   // Rotate only random-mode services whose configured interval has elapsed.
   // Services set to 'startup only' (rotationIntervalMs === 0) are skipped here
   // but are still rotated by lightStartup on browser start.
+  const allSettings = await getSettings();
   await Promise.all(services.map(async service => {
-    const settings = await getServiceSettings(service.id);
+    const settings = allSettings[service.id] ?? {};
     if (settings.mode !== 'random') return;
     const intervalMs = settings.rotationIntervalMs ?? 3_600_000;
     if (intervalMs === 0) return;
@@ -221,7 +222,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
     const oldSvc = oldSettings[service.id];
     const newSvc = newSettings[service.id];
 
-    if (JSON.stringify(oldSvc) === JSON.stringify(newSvc)) continue;
+    if (shallowEqual(oldSvc, newSvc)) continue;
 
     // Only Google Fonts uses DNR — skip all other services.
     if (service.id !== 'googlefonts') continue;
@@ -249,6 +250,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 /**
+ * Shallow equality check for two objects (one level deep).
+ * Avoids the cost and key-ordering fragility of JSON.stringify.
+ * @param {object} a
+ * @param {object} b
+ * @returns {boolean}
+ */
+function shallowEqual(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+/**
  * @param {{action: string, [key: string]: any}} message
  * @returns {Promise<any>}
  */
@@ -263,12 +283,15 @@ async function handleMessage(message) {
       return getGlobalSettings();
 
     case 'setGlobalSettings': {
+      if (!message.settings || typeof message.settings !== 'object') throw new Error('Invalid settings');
       await setGlobalSettings(message.settings);
       return { ok: true };
     }
 
     case 'setServiceSettings': {
       const { serviceId, settings } = message;
+      if (typeof serviceId !== 'string') throw new Error('Invalid serviceId');
+      if (!settings || typeof settings !== 'object') throw new Error('Invalid settings');
       const service = getById(serviceId);
       if (!service) throw new Error(`Unknown service: ${serviceId}`);
 
