@@ -29,8 +29,8 @@
  * @property {number}   ruleIdStart  - inclusive start of reserved DNR rule ID range
  * @property {number}   ruleIdEnd    - inclusive end of reserved DNR rule ID range
  * @property {{url: string|null, cacheTTLMs: number, parse: function, fallbackFile: string, responseType?: string, fetchOptions?: RequestInit}} instanceFetcher
- * @property {function(string, ServiceSettings): import('chrome').declarativeNetRequest.Rule[]} buildRules
- * @property {function(string, string): string|null} transformUrl
+ * @property {function(string, ServiceSettings, string[]): import('chrome').declarativeNetRequest.Rule[]} [buildRules] - DNR rule builder; only the Google Fonts service defines this. Navigation services redirect via content/redirect.js.
+ * @property {function(string, string): string|null} [transformUrl] - content-script URL transformer; defined by all navigation services (not Google Fonts).
  * @property {function(): ServiceSettings} defaultSettings
  */
 

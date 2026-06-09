@@ -1,15 +1,18 @@
 /**
  * dnr.js
- * Manages Declarative Net Request (DNR) dynamic rules for all services.
+ * Manages Declarative Net Request (DNR) dynamic rules for the Google Fonts
+ * service — the only service still using DNR. All navigation services
+ * (YouTube, Reddit, Imgur, TikTok, Medium) redirect via the content script
+ * (content/redirect.js) and do not use this module.
  *
  * Architecture:
- *   - All rules are dynamic (not static rulesets) because the redirect URL
- *     depends on the currently selected instance, which changes at runtime.
- *   - Rules are rebuilt only when:
- *       • a service is toggled enabled/disabled
- *       • the currentInstance for a service changes (rotation or fixed selection)
- *   - Each service has a reserved ID range (ruleIdStart–ruleIdEnd).
- *     Rebuilding a service's rules removes all IDs in that range and replaces them.
+ *   - The rule is dynamic (not a static ruleset) so its excludedInitiatorDomains
+ *     can be recomputed from the current instance caches at runtime.
+ *   - It is rebuilt only when:
+ *       • Google Fonts is toggled enabled/disabled
+ *       • a fresh instance fetch may have changed the excluded-domains set
+ *   - Google Fonts owns the reserved ID range 3000–3999; rebuilding removes all
+ *     IDs in that range and replaces them.
  *
  * Privacy:
  *   - The extension ID is passed in but used only to build the

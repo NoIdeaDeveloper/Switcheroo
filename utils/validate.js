@@ -36,10 +36,19 @@ export function isValidInstanceUrl(url, sourceHosts = []) {
   // Must be HTTPS
   if (parsed.protocol !== 'https:') return false;
 
-  // Must not redirect back to a source domain
+  // Must not redirect back to a source domain. Entries may be exact hostnames
+  // ("reddit.com") or wildcards ("*.medium.com") which match the base domain
+  // and any subdomain.
   const hostname = parsed.hostname.toLowerCase();
-  const normalizedSources = sourceHosts.map(h => h.toLowerCase());
-  if (normalizedSources.includes(hostname)) return false;
+  for (const src of sourceHosts) {
+    const s = src.toLowerCase();
+    if (s.startsWith('*.')) {
+      const base = s.slice(2);
+      if (hostname === base || hostname.endsWith('.' + base)) return false;
+    } else if (hostname === s) {
+      return false;
+    }
+  }
 
   return true;
 }

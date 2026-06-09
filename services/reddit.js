@@ -1,16 +1,10 @@
 /**
  * reddit.js — Reddit → Redlib service definition
  *
- * DNR rule strategy:
- *
- *   2000  /search?q=QUERY  (priority 2 — must win over the path catch-all)
- *   2001  reddit.com homepage  (priority 2)
- *   2002  /r/... /u/... /user/... etc. path catch-all  (priority 1)
- *   2003  old.reddit.com path catch-all  (priority 1)
- *
- * All rules strip query parameters except for /search (which preserves q=).
- * Tracking params (utm_*, ref, ref_source, correlation_id, share_id) are
- * discarded naturally because we reconstruct URLs from the path only.
+ * Redirection is performed by the content script (content/redirect.js) via
+ * transformUrl() below. transformUrl forwards the path only (preserving q= on
+ * /search) and discards query strings, so tracking params (utm_*, ref,
+ * ref_source, correlation_id, share_id) are stripped naturally.
  *
  * Cloudflare instances: Redlib's instances.json includes a `cloudflare` field.
  * Instances with cloudflare: true are stored but excluded from the active
@@ -48,74 +42,6 @@ export const redditService = {
     },
 
     fallbackFile: 'data/reddit-fallback.json',
-  },
-
-  /**
-   * Builds DNR rules for the given instance URL.
-   * Returns an empty array if the service is disabled or no instance is set.
-   *
-   * @param {string} _extensionId - unused (kept for ServiceDefinition interface consistency)
-   * @param {import('./registry.js').ServiceSettings} settings
-   * @param {string[]} excludedInitiatorDomains
-   * @returns {chrome.declarativeNetRequest.Rule[]}
-   */
-  buildRules(_extensionId, settings, excludedInitiatorDomains = []) {
-    if (!settings.enabled) return [];
-
-    const instance = settings.currentInstance;
-    if (!instance) return [];
-
-    const cond = (regexFilter) => ({
-      regexFilter,
-      resourceTypes: ['main_frame'],
-      isUrlFilterCaseSensitive: false,
-      excludedInitiatorDomains,
-    });
-
-    const redirect = (regexSubstitution) => ({
-      type: 'redirect',
-      redirect: { regexSubstitution },
-    });
-
-    return [
-      // 2000 — /search?q=QUERY  (priority 2: must beat the path catch-all)
-      {
-        id: 2000,
-        priority: 2,
-        condition: cond('^https?://(www\\.)?reddit\\.com/search\\?(?:[^#]*&)?q=([^&#]*)'),
-        action: redirect(`${instance}/search?q=\\2`),
-      },
-
-      // 2001 — Reddit homepage with optional query string / fragment
-      //   (priority 2: must beat path catch-all)
-      //   ^…\.com/? — optional trailing slash
-      //   (?:[?#].*)? — optional query string or hash (e.g. ?sort=hot, ?ref=homepage)
-      //   Fixes: reddit.com/?sort=hot previously slipped through and hit Reddit directly.
-      {
-        id: 2001,
-        priority: 2,
-        condition: cond('^https?://(www\\.)?reddit\\.com/?(?:[?#].*)?$'),
-        action: redirect(`${instance}/`),
-      },
-
-      // 2002 — www.reddit.com path catch-all  (priority 1)
-      // Captures the path (e.g. /r/privacy/comments/abc123/title/) and discards
-      // query strings. This strips all tracking params cleanly.
-      {
-        id: 2002,
-        priority: 1,
-        condition: cond('^https?://(www\\.)?reddit\\.com(/[^?#]+)'),
-        action: redirect(`${instance}\\2`),
-      },
-
-      // 2003 — old.reddit.com path catch-all  (priority 1)
-      {
-        id: 2003,
-        priority: 1,
-        condition: cond('^https?://old\\.reddit\\.com(/[^?#]*)'),
-        action: redirect(`${instance}\\1`),
-      },
-    ];
   },
 
   /**

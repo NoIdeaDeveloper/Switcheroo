@@ -1,25 +1,20 @@
 /**
  * imgur.js — Imgur → Rimgo service definition
  *
- * DNR rule strategy:
- *
- *   4000  imgur.com homepage  (priority 2 — beats path catch-all)
- *   4001  imgur.com path catch-all  (priority 1)
- *   4002  i.imgur.com direct image URLs  (priority 1, main_frame + image)
- *   4003  i.imgur.com homepage  (priority 2)
+ * Redirection is performed by the content script (content/redirect.js) via
+ * transformUrl() below.
  *
  * Rimgo URL mapping:
  *   imgur.com/* paths are served at the same path on the rimgo instance.
  *   i.imgur.com/HASH.ext direct image links are served at /media/HASH.ext.
  *
- * Tracking params are discarded naturally because we reconstruct URLs from
- * the path only (query strings are not forwarded).
+ * Tracking params are discarded because URLs are reconstructed from the path
+ * only (query strings are not forwarded).
  *
  * The instance API at rimgo.codeberg.page/api.json returns a `clearnet`
  * array. There is no uptime or Cloudflare field — instances are flagged
  * only by the `note` string ("✅ Data not collected" / "⚠️ Data collected").
- * We treat any instance with a "Data collected" note as a Cloudflare/
- * privacy-reduced instance so users can filter them.
+ * Instances with a "Data collected" note are flagged so users can filter them.
  */
 
 /** @type {import('./registry.js').ServiceDefinition} */
@@ -54,78 +49,13 @@ export const imgurService = {
           meta: (() => {
             const m = {};
             if (inst.provider) m['Provider'] = inst.provider;
-            if (inst.note) m['Status'] = inst.note.replace(/[\u2705\u26a0\ufe0f]/gu, '').trim();
+            if (inst.note) m['Status'] = inst.note.replace(/[✅⚠️]/gu, '').trim();
             return Object.keys(m).length ? m : undefined;
           })(),
         }));
     },
 
     fallbackFile: 'data/imgur-fallback.json',
-  },
-
-  /**
-   * Builds DNR rules for the given instance URL.
-   * Returns an empty array if the service is disabled or no instance is set.
-   *
-   * @param {string} _extensionId - unused (kept for ServiceDefinition interface consistency)
-   * @param {import('./registry.js').ServiceSettings} settings
-   * @param {string[]} excludedInitiatorDomains
-   * @returns {chrome.declarativeNetRequest.Rule[]}
-   */
-  buildRules(_extensionId, settings, excludedInitiatorDomains = []) {
-    if (!settings.enabled) return [];
-
-    const instance = settings.currentInstance;
-    if (!instance) return [];
-
-    const cond = (regexFilter, resourceTypes = ['main_frame']) => ({
-      regexFilter,
-      resourceTypes,
-      isUrlFilterCaseSensitive: false,
-      excludedInitiatorDomains,
-    });
-
-    const redirect = (regexSubstitution) => ({
-      type: 'redirect',
-      redirect: { regexSubstitution },
-    });
-
-    return [
-      // 4000 — Imgur homepage with optional query string / fragment  (priority 2)
-      {
-        id: 4000,
-        priority: 2,
-        condition: cond('^https?://(www\\.)?imgur\\.com/?(?:[?#].*)?$'),
-        action: redirect(`${instance}/`),
-      },
-
-      // 4001 — imgur.com path catch-all  (priority 1)
-      // Captures the path and discards query strings.
-      {
-        id: 4001,
-        priority: 1,
-        condition: cond('^https?://(www\\.)?imgur\\.com(/[^?#]+)'),
-        action: redirect(`${instance}\\2`),
-      },
-
-      // 4002 — i.imgur.com direct image URLs  (priority 1)
-      // Rimgo serves these at /media/<hash>.<ext>.
-      // Intercepts both direct navigation (main_frame) and embedded images.
-      {
-        id: 4002,
-        priority: 1,
-        condition: cond('^https?://i\\.imgur\\.com(/[^?#]+)', ['main_frame', 'image']),
-        action: redirect(`${instance}/media\\1`),
-      },
-
-      // 4003 — i.imgur.com homepage  (priority 2)
-      {
-        id: 4003,
-        priority: 2,
-        condition: cond('^https?://i\\.imgur\\.com/?(?:[?#].*)?$'),
-        action: redirect(`${instance}/`),
-      },
-    ];
   },
 
   /**

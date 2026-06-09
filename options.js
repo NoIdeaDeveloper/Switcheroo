@@ -42,19 +42,27 @@ const SERVICE_META = {
   scribe: {
     label: 'Medium', target: 'Scribe',
     fetchUrl: 'https://git.sr.ht/~edwardloveall/scribe/blob/main/docs/instances.md',
-    sourceHosts: ['medium.com', 'www.medium.com'],
+    sourceHosts: ['medium.com', 'www.medium.com', '*.medium.com'],
   },
 };
 
-function debounce(fn, ms) {
-  let t;
-  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
+// Per-service debounced save. Each service gets its own timer, and successive
+// patches for the same service are merged — so changing two fields (or two
+// different services) within the debounce window never drops a write.
+const savePatches = {};
+const saveTimers = {};
 
-const debouncedSave = debounce(async (serviceId, patch) => {
-  try { await sendMessage({ action: 'setServiceSettings', serviceId, settings: patch }); }
-  catch (err) { console.error('[Rooroute] Save failed:', err); }
-}, 350);
+function debouncedSave(serviceId, patch) {
+  savePatches[serviceId] = { ...(savePatches[serviceId] ?? {}), ...patch };
+  clearTimeout(saveTimers[serviceId]);
+  saveTimers[serviceId] = setTimeout(async () => {
+    const settings = savePatches[serviceId];
+    delete savePatches[serviceId];
+    delete saveTimers[serviceId];
+    try { await sendMessage({ action: 'setServiceSettings', serviceId, settings }); }
+    catch (err) { console.error('[Rooroute] Save failed:', err); }
+  }, 350);
+}
 
 // ─── Global settings card ─────────────────────────────────────────────────────
 
@@ -724,11 +732,22 @@ function buildRow(serviceId, svc, inst, flag) {
 
 // ── Enable/disable instances ──────────────────────────────────────────────────
 
-const pendingEnabled = {};
+const pendingEnabledTimers = {};
+const pendingEnabledDeltas = {};
 
 async function updateEnabled(serviceId, url, enabled) {
-  clearTimeout(pendingEnabled[serviceId]);
-  pendingEnabled[serviceId] = setTimeout(async () => {
+  // Accumulate every toggle into a per-service delta map keyed by URL, then
+  // apply them all in one write when the timer fires. Re-reading settings on
+  // each toggle (as a single survivor) would drop earlier toggles, because the
+  // earlier writes hadn't been persisted yet.
+  (pendingEnabledDeltas[serviceId] ??= new Map()).set(url, enabled);
+
+  clearTimeout(pendingEnabledTimers[serviceId]);
+  pendingEnabledTimers[serviceId] = setTimeout(async () => {
+    const deltas = pendingEnabledDeltas[serviceId];
+    delete pendingEnabledDeltas[serviceId];
+    delete pendingEnabledTimers[serviceId];
+
     const settings = await sendMessage({ action: 'getSettings' });
     const svc = settings[serviceId] ?? {};
     let list = [...(svc.enabledInstances ?? [])];
@@ -739,10 +758,12 @@ async function updateEnabled(serviceId, url, enabled) {
       list = (all ?? []).map(i => i.url);
     }
 
-    if (enabled) { if (!list.includes(url)) list.push(url); }
-    else { list = list.filter(u => u !== url); }
+    const set = new Set(list);
+    for (const [u, on] of deltas) {
+      if (on) set.add(u); else set.delete(u);
+    }
 
-    sendMessage({ action: 'setServiceSettings', serviceId, settings: { enabledInstances: list } })
+    sendMessage({ action: 'setServiceSettings', serviceId, settings: { enabledInstances: [...set] } })
       .catch(console.error);
   }, 350);
 }

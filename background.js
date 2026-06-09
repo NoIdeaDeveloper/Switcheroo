@@ -179,15 +179,20 @@ chrome.alarms.onAlarm.addListener(async alarm => {
 
   // Fetch fresh instance data only when auto-refresh is enabled and the cache is stale.
   const { instanceRefreshIntervalMs } = await getGlobalSettings();
+  let instancesChanged = false;
   if (instanceRefreshIntervalMs !== null) {
-    await Promise.all(
+    const results = await Promise.all(
       services
         .filter(s => s.instanceFetcher.url)
         .map(async service => {
           const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
-          if (stale) await fetchInstances(service).catch(err => console.debug('[Rooroute] stale-cache refresh failed:', err));
+          if (!stale) return false;
+          const fetched = await fetchInstances(service)
+            .catch(err => { console.debug('[Rooroute] stale-cache refresh failed:', err); return null; });
+          return fetched !== null;
         })
     );
+    instancesChanged = results.some(Boolean);
   }
 
   // Rotate only random-mode services whose configured interval has elapsed.
@@ -204,8 +209,12 @@ chrome.alarms.onAlarm.addListener(async alarm => {
     }
   }));
 
-  // Rebuild Google Fonts DNR rule — the only service still using DNR.
-  await rebuildGoogleFontsRules(extensionId);
+  // Rebuild the Google Fonts DNR rule only when freshly-fetched instance data
+  // may have changed the excluded-initiator-domains set. The rule is otherwise
+  // persistent across service-worker restarts and is (re)built on
+  // install/startup/update and whenever Google Fonts settings change, so there
+  // is no need to rewrite it on every alarm tick.
+  if (instancesChanged) await rebuildGoogleFontsRules(extensionId);
 });
 
 chrome.storage.onChanged.addListener(async (changes, area) => {

@@ -29,7 +29,9 @@ export async function fetchInstances(service) {
   if (!service.instanceFetcher.url) return null;
 
   try {
-    const fetchOpts = service.instanceFetcher.fetchOptions ?? {};
+    // Abort hung connections so a stalled endpoint can't keep the service
+    // worker alive indefinitely; the alarm will retry on the next tick.
+    const fetchOpts = { signal: AbortSignal.timeout(8000), ...(service.instanceFetcher.fetchOptions ?? {}) };
     const response = await fetch(service.instanceFetcher.url, fetchOpts);
     if (!response.ok) {
       console.warn(`[Rooroute] Failed to fetch instances for ${service.id}: HTTP ${response.status}`);

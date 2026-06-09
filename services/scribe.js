@@ -1,15 +1,9 @@
 /**
  * scribe.js — Medium → Scribe service definition
  *
- * DNR rule strategy:
- *
- *   6000  medium.com homepage  (priority 2 — beats path catch-all)
- *   6001  medium.com path catch-all  (priority 1)
- *   6002  *.medium.com subdomain homepage  (priority 2)
- *   6003  *.medium.com subdomain path catch-all  (priority 1)
- *
- * Scribe mirrors the Medium URL structure exactly, so the redirect simply
- * swaps the host:
+ * Redirection is performed by the content script (content/redirect.js) via
+ * transformUrl() below. Scribe mirrors the Medium URL structure exactly, so
+ * the redirect simply swaps the host:
  *   medium.com/@user/my-post-09a6af907a2  →  instance/@user/my-post-09a6af907a2
  *   medium.com/topic/technology            →  instance/topic/technology
  *   user.medium.com/my-post               →  instance/my-post
@@ -72,71 +66,6 @@ export const scribeService = {
     },
 
     fallbackFile: 'data/scribe-fallback.json',
-  },
-
-  /**
-   * Builds DNR rules for the given instance URL.
-   * Returns an empty array if the service is disabled or no instance is set.
-   *
-   * @param {string} _extensionId - unused (kept for ServiceDefinition interface consistency)
-   * @param {import('./registry.js').ServiceSettings} settings
-   * @param {string[]} excludedInitiatorDomains
-   * @returns {chrome.declarativeNetRequest.Rule[]}
-   */
-  buildRules(_extensionId, settings, excludedInitiatorDomains = []) {
-    if (!settings.enabled) return [];
-
-    const instance = settings.currentInstance;
-    if (!instance) return [];
-
-    const cond = (regexFilter) => ({
-      regexFilter,
-      resourceTypes: ['main_frame'],
-      isUrlFilterCaseSensitive: false,
-      excludedInitiatorDomains,
-    });
-
-    const redirect = (regexSubstitution) => ({
-      type: 'redirect',
-      redirect: { regexSubstitution },
-    });
-
-    return [
-      // 6000 — Medium homepage with optional query string / fragment  (priority 2)
-      {
-        id: 6000,
-        priority: 2,
-        condition: cond('^https?://(www\\.)?medium\\.com/?(?:[?#].*)?$'),
-        action: redirect(`${instance}/`),
-      },
-
-      // 6001 — medium.com path catch-all  (priority 1)
-      // Captures the path and discards query strings.
-      {
-        id: 6001,
-        priority: 1,
-        condition: cond('^https?://(www\\.)?medium\\.com(/[^?#]+)'),
-        action: redirect(`${instance}\\2`),
-      },
-
-      // 6002 — *.medium.com subdomain homepage  (priority 2)
-      // Handles user.medium.com without a path.
-      {
-        id: 6002,
-        priority: 2,
-        condition: cond('^https?://[^./]+\\.medium\\.com/?(?:[?#].*)?$'),
-        action: redirect(`${instance}/`),
-      },
-
-      // 6003 — *.medium.com subdomain path catch-all  (priority 1)
-      // Handles user.medium.com/article-slug → instance/article-slug
-      {
-        id: 6003,
-        priority: 1,
-        condition: cond('^https?://[^./]+\\.medium\\.com(/[^?#]+)'),
-        action: redirect(`${instance}\\1`),
-      },
-    ];
   },
 
   /**
