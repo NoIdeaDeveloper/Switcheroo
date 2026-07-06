@@ -31,3 +31,28 @@ export function sendMessage(message) {
     });
   });
 }
+
+/**
+ * Resolves the effective theme ('dark' or '') from a preference string.
+ * 'system' follows the OS prefers-color-scheme media query.
+ * Legacy booleans are normalized: true → 'dark', false → ''.
+ * @param {string|boolean} pref
+ * @returns {'dark'|''}
+ */
+export function resolveTheme(pref) {
+  if (pref === 'dark') return 'dark';
+  if (pref === 'light') return '';
+  if (pref === true) return 'dark';
+  if (pref === false) return '';
+  // 'system' or anything else → follow OS preference
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : '';
+}
+
+/**
+ * Applies the effective theme to the document element.
+ * @param {'dark'|''} theme
+ */
+export function applyTheme(theme) {
+  if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
+  else delete document.documentElement.dataset.theme;
+}

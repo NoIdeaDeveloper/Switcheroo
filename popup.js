@@ -1,13 +1,20 @@
 /**
- * popup.js — Rooroute toolbar popup
+ * popup.js — Switcheroo toolbar popup
  * No network requests. All data flows through sendMessage → background.
  */
 
-import { escHtml, sendMessage } from './utils/ui.js';
+import { escHtml, sendMessage, resolveTheme, applyTheme } from './utils/ui.js';
 
-// Apply dark mode from storage immediately to minimise flash before init() runs.
+// Apply the saved theme preference immediately to minimise flash before init() runs.
 chrome.storage.local.get('globalSettings', result => {
-  if (result.globalSettings?.darkMode) document.documentElement.dataset.theme = 'dark';
+  applyTheme(resolveTheme(result.globalSettings?.darkMode ?? 'system'));
+});
+
+// When preference is 'system', follow OS theme changes live while the popup is open.
+window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', async () => {
+  const result = await chrome.storage.local.get('globalSettings');
+  const pref = result.globalSettings?.darkMode ?? 'system';
+  if (pref === 'system') applyTheme(resolveTheme(pref));
 });
 
 const SERVICE_META = {
@@ -114,9 +121,22 @@ function buildStatusRow(serviceId, settings, instances) {
       left.append(dot, text);
     }
   } else {
+    // Random mode: show the currently-selected instance host plus the pool size,
+    // a Cloudflare badge if applicable, and a "rotate now" button so the user
+    // can pick a different instance without waiting for the interval to elapse.
     const count = countActive(instances, settings);
-    text.innerHTML = `Random &middot; <strong>${count}</strong> instance${count !== 1 ? 's' : ''}`;
-    left.append(dot, text);
+    const host = settings.currentInstance ? hostOnly(settings.currentInstance) : '—';
+    text.innerHTML = `Random &middot; <strong>${escHtml(host)}</strong> <span class="status-count">(${count})</span>`;
+    const cfMatch = instances?.find(i => i.url === settings.currentInstance && i.cloudflare);
+    if (cfMatch) {
+      const badge = document.createElement('span');
+      badge.className = 'badge-cf';
+      badge.textContent = 'CF';
+      badge.title = 'This instance is behind Cloudflare';
+      left.append(dot, text, badge);
+    } else {
+      left.append(dot, text);
+    }
   }
 
   // Settings link
@@ -125,7 +145,31 @@ function buildStatusRow(serviceId, settings, instances) {
   link.textContent = 'Settings ›';
   link.dataset.serviceId = serviceId;
 
-  row.append(left, link);
+  // "Rotate now" button: shown only for random-mode navigation services so the
+  // user can pick a different instance without opening Settings or waiting for
+  // the rotation interval to elapse. Static-redirect (Google Fonts) and fixed
+  // mode have no meaningful "rotate" action.
+  const showRotate = settings.enabled && !meta.staticRedirect && settings.mode !== 'fixed';
+  if (showRotate) {
+    const rotate = document.createElement('button');
+    rotate.className = 'rotate-btn';
+    rotate.type = 'button';
+    rotate.title = 'Pick a different instance now';
+    rotate.setAttribute('aria-label', 'Pick a different instance now');
+    rotate.dataset.serviceId = serviceId;
+    rotate.innerHTML = '&#x21bb;'; // clockwise arrow
+    row.append(left, rotate);
+  } else {
+    row.append(left);
+  }
+
+  // Settings link
+  const link = document.createElement('button');
+  link.className = 'settings-link';
+  link.textContent = 'Settings ›';
+  link.dataset.serviceId = serviceId;
+
+  row.append(link);
   return row;
 }
 
@@ -247,38 +291,30 @@ async function init() {
 
   container.innerHTML = '';
 
-  let cardsAdded = 0;
+  // Render enabled cards first, then disabled ones as muted cards so the user
+  // can re-enable them directly from the popup without visiting Settings.
+  const enabledIds = [];
+  const disabledIds = [];
   for (const id of Object.keys(SERVICE_META)) {
     if (!settings[id]) continue;
-    if (!settings[id].enabled) continue; // disabled services are hidden from the popup
-    container.append(buildCard(id, settings[id], allInstances[id] ?? []));
-    cardsAdded++;
+    (settings[id].enabled ? enabledIds : disabledIds).push(id);
   }
 
-  if (cardsAdded === 0) {
+  for (const id of enabledIds) {
+    container.append(buildCard(id, settings[id], allInstances[id] ?? []));
+  }
+  for (const id of disabledIds) {
+    container.append(buildCard(id, settings[id], allInstances[id] ?? []));
+  }
+
+  if (enabledIds.length === 0 && disabledIds.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'loading-wrap loading-wrap--muted';
-    empty.textContent = 'All redirects are off. Enable one in Settings.';
+    empty.textContent = 'No services configured. Open Settings to get started.';
     container.append(empty);
   }
 
   attachListeners(settings);
-}
-
-/**
- * Animates a card element to height 0 then removes it from the DOM.
- * Uses a forced-reflow trick so the transition fires correctly.
- * @param {HTMLElement} card
- */
-function animateCardOut(card) {
-  card.style.height = card.offsetHeight + 'px';
-  card.style.overflow = 'hidden';
-  // Reading offsetHeight forces layout, committing the initial height before transition starts
-  card.offsetHeight; // eslint-disable-line no-unused-expressions
-  card.style.transition = 'height 0.28s ease, opacity 0.22s ease';
-  card.style.height = '0';
-  card.style.opacity = '0';
-  setTimeout(() => card.remove(), 300);
 }
 
 function attachListeners(settings) {
@@ -287,19 +323,52 @@ function attachListeners(settings) {
     input.addEventListener('change', async () => {
       const id = input.dataset.serviceId;
       const enabled = input.checked;
+      const card = document.querySelector(`.card[data-service-id="${id}"]`);
 
-      if (!enabled) {
-        // Optimistically animate the card out immediately for snappy feel
-        const card = document.querySelector(`.card[data-service-id="${id}"]`);
-        if (card) animateCardOut(card);
+      // Optimistically flip the muted state immediately for snappy feel.
+      // The card stays in place so the user can toggle it back without a
+      // trip to the settings page.
+      if (card) {
+        card.classList.toggle('disabled', !enabled);
+        const accent = card.querySelector('.card-accent');
+        if (accent) {
+          const meta = SERVICE_META[id] ?? {};
+          accent.style.background = enabled ? meta.accentColor : '#E8D8CE';
+        }
+        const dot = card.querySelector('.status-dot');
+        if (dot) dot.classList.toggle('off', !enabled);
+        const statusText = card.querySelector('.status-text');
+        if (statusText) statusText.textContent = enabled ? '' : 'Disabled';
+        // Re-render the status row text via init() once the save completes so
+        // the displayed instance/count is accurate. Done below in the success path.
       }
 
       try {
         await sendMessage({ action: 'setServiceSettings', serviceId: id, settings: { enabled } });
+        // Re-render the whole popup so the status row reflects the new state
+        // (and the card moves to the correct enabled/disabled group ordering).
+        await init();
       } catch {
-        // Save failed — restore the full popup state
-        if (!enabled) await init();
-        else input.checked = false;
+        // Save failed — restore the toggle and muted state
+        input.checked = !enabled;
+        if (card) card.classList.toggle('disabled', !enabled);
+      }
+    });
+  });
+
+  // Rotate-now buttons (random mode only): pick a new instance immediately.
+  document.querySelectorAll('.rotate-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.serviceId;
+      btn.disabled = true;
+      try {
+        await sendMessage({ action: 'rotateNow', serviceId: id });
+        // Re-render so the status row reflects the newly-picked instance.
+        await init();
+      } catch {
+        // ignore — leave the previous instance displayed
+      } finally {
+        btn.disabled = false;
       }
     });
   });

@@ -1,5 +1,5 @@
 /**
- * background.js — Rooroute service worker
+ * background.js — Switcheroo service worker
  *
  * Responsibilities:
  *   1. On install: initialise storage defaults, fetch instances, build DNR rules
@@ -141,7 +141,7 @@ async function lightStartup(extensionId) {
     .map(async service => {
       const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
       if (stale) {
-        fetchInstances(service).catch(err => console.debug('[Rooroute] fire-and-forget fetch failed:', err)); // alarm will retry
+        fetchInstances(service).catch(err => console.debug('[Switcheroo] fire-and-forget fetch failed:', err)); // alarm will retry
       }
     })
   );
@@ -188,7 +188,7 @@ chrome.alarms.onAlarm.addListener(async alarm => {
           const stale = await isCacheStale(service.id, instanceRefreshIntervalMs);
           if (!stale) return false;
           const fetched = await fetchInstances(service)
-            .catch(err => { console.debug('[Rooroute] stale-cache refresh failed:', err); return null; });
+            .catch(err => { console.debug('[Switcheroo] stale-cache refresh failed:', err); return null; });
           return fetched !== null;
         })
     );
@@ -251,7 +251,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id) return false;
 
   handleMessage(message).then(sendResponse).catch(err => {
-    console.error('[Rooroute] Message handler error:', err);
+    console.error('[Switcheroo] Message handler error:', err);
     sendResponse({ error: err.message });
   });
 
@@ -375,6 +375,46 @@ async function handleMessage(message) {
         instances = await getCachedOrFetchInstances(service);
       }
       return instances;
+    }
+
+    case 'rotateNow': {
+      // Manually trigger an instance rotation for a single service, ignoring
+      // the rotation interval. Returns the new currentInstance host (or null).
+      const { serviceId } = message;
+      const service = getById(serviceId);
+      if (!service) throw new Error(`Unknown service: ${serviceId}`);
+      const chosen = await rotateInstance(service);
+      return { ok: true, currentInstance: chosen };
+    }
+
+    case 'importSettings': {
+      // Replace settings + globalSettings from a user-supplied JSON snapshot.
+      // Per-service patches are merged onto existing defaults so missing fields
+      // don't break the running extension.
+      const { settings, globalSettings } = message;
+      if (!settings || typeof settings !== 'object') throw new Error('Invalid settings');
+      if (!globalSettings || typeof globalSettings !== 'object') throw new Error('Invalid globalSettings');
+
+      const merged = { ...await getSettings() };
+      for (const service of getAll()) {
+        if (settings[service.id] && typeof settings[service.id] === 'object') {
+          merged[service.id] = { ...service.defaultSettings(), ...settings[service.id] };
+        }
+      }
+      await chrome.storage.local.set({ settings: merged, globalSettings: { ...await getGlobalSettings(), ...globalSettings } });
+      return { ok: true };
+    }
+
+    case 'resetAllSettings': {
+      // Restore every service and the global settings to their built-in defaults.
+      const services = getAll();
+      const settings = {};
+      for (const service of services) settings[service.id] = service.defaultSettings();
+      const { GLOBAL_DEFAULTS } = await import('./utils/storage.js');
+      await chrome.storage.local.set({ settings, globalSettings: { ...GLOBAL_DEFAULTS } });
+      // Re-resolve current instances for any random-mode services.
+      await rotateAllInstances(chrome.runtime.id);
+      return { ok: true };
     }
 
     default:

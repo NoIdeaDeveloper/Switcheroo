@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Rooroute — Popup
+   Switcheroo — Popup
    Palette: warm cream / peachy coral / sage mint / soft lavender
    ═══════════════════════════════════════════════════════════════ */
 
@@ -315,6 +315,46 @@ body {
 
 .settings-link:hover { color: var(--text); }
 
+/* ── Rotate-now button (random mode) ─────────────────────────── */
+
+.rotate-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, border-color 0.15s, transform 0.2s;
+}
+
+.rotate-btn:hover {
+  color: var(--peach-dk);
+  border-color: var(--peach-dk);
+  transform: rotate(-60deg);
+}
+
+.rotate-btn:active { transform: rotate(180deg); }
+
+.rotate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Pool size in random-mode status line */
+.status-count {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 /* ── Cloudflare warning badge ─────────────────────────────────── */
 
 .badge-cf {
@@ -398,6 +438,28 @@ html[data-theme="dark"] .badge-cf {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Keyboard focus indicators ──────────────────────────────────
+   Visible only for keyboard navigation (Tab key); suppressed for
+   mouse clicks via :focus-visible. Uses --peach-dk for contrast. */
+
+.toggle input:focus-visible + .toggle-track,
+.toggle input:focus-visible ~ .toggle-thumb {
+  outline: 2px solid var(--peach-dk);
+  outline-offset: 2px;
+}
+
+.footer-btn:focus-visible,
+.settings-link:focus-visible,
+.popup-modal-btn:focus-visible,
+.rotate-btn:focus-visible {
+  outline: 2px solid var(--peach-dk);
+  outline-offset: 2px;
+}
+
+.popup-modal-btn--primary:focus-visible {
+  outline-color: var(--text);
 }
 
 .spinning { animation: spin 0.7s linear infinite; }

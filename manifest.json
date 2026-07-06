@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Switcheroo",
   "version": "2.2.0",
-  "description": "Redirect YouTube, Reddit, Imgur, TikTok, and Medium to privacy-friendly frontends.",
+  "description": "Redirect YouTube, Reddit, Google Fonts, Imgur, TikTok, and Medium to privacy-friendly frontends.",
   "permissions": [
     "declarativeNetRequest",
     "storage",

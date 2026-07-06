@@ -20,6 +20,7 @@
  * @property {string}   currentInstance   - URL of the actively used instance
  * @property {string[]} enabledInstances  - empty = all enabled (opt-out model)
  * @property {boolean}  allowCloudflare
+ * @property {string[]} excludedUrls   - URL prefixes that bypass redirection (empty = redirect all)
  *
  * @typedef {object} ServiceDefinition
  * @property {string}   id

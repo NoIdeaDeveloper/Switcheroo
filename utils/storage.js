@@ -14,7 +14,9 @@ const GLOBAL_DEFAULTS = {
   // How often to automatically fetch updated instance lists.
   // null = Off (never fetch automatically; user must refresh manually).
   instanceRefreshIntervalMs: 3_600_000, // 1 hour
-  darkMode: false,
+  // Theme preference: 'system' (follow OS prefers-color-scheme), 'dark', or 'light'.
+  // Legacy boolean values (true/false) are normalized on read.
+  darkMode: 'system',
 };
 
 // ─── Settings ────────────────────────────────────────────────────────────────
@@ -71,11 +73,16 @@ export async function initializeDefaults(services) {
 
 /**
  * Returns the global (cross-service) settings, merged with defaults.
- * @returns {Promise<{instanceRefreshIntervalMs: number|null}>}
+ * Normalizes legacy boolean darkMode values to the new 3-state string:
+ * true → 'dark', false → 'light'.
+ * @returns {Promise<{instanceRefreshIntervalMs: number|null, darkMode: string}>}
  */
 export async function getGlobalSettings() {
   const result = await chrome.storage.local.get(GLOBAL_SETTINGS_KEY);
-  return { ...GLOBAL_DEFAULTS, ...(result[GLOBAL_SETTINGS_KEY] ?? {}) };
+  const merged = { ...GLOBAL_DEFAULTS, ...(result[GLOBAL_SETTINGS_KEY] ?? {}) };
+  if (merged.darkMode === true) merged.darkMode = 'dark';
+  else if (merged.darkMode === false) merged.darkMode = 'light';
+  return merged;
 }
 
 /**

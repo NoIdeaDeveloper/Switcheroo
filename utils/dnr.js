@@ -81,7 +81,7 @@ export async function applyRulesForService(service, extensionId, serviceSettings
   try {
     await chrome.declarativeNetRequest.updateDynamicRules({ addRules, removeRuleIds });
   } catch (err) {
-    console.error(`[Rooroute] Failed to update DNR rules for ${service.id}:`, err);
+    console.error(`[Switcheroo] Failed to update DNR rules for ${service.id}:`, err);
     throw err;
   }
 }
@@ -102,7 +102,7 @@ export async function rebuildGoogleFontsRules(extensionId) {
 }
 
 /**
- * Removes all DNR rules managed by Rooroute.
+ * Removes all DNR rules managed by Switcheroo.
  * Used when the extension is disabled or during cleanup.
  *
  * @param {string} extensionId

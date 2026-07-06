@@ -90,6 +90,7 @@ export const redditService = {
       allowCloudflare: false,
       rotationIntervalMs: 3_600_000, // how often to rotate in random mode (ms)
       lastRotatedAt: 0,              // timestamp of last rotation (set by background.js)
+      excludedUrls: [],             // URL prefixes that should not be redirected
     };
   },
 };

@@ -1,14 +1,22 @@
 /**
- * options.js — Rooroute full settings page.
+ * options.js — Switcheroo full settings page.
  * No network requests. All data flows through sendMessage → background.
  */
 
-import { escHtml, sendMessage } from './utils/ui.js';
+import { escHtml, sendMessage, resolveTheme, applyTheme } from './utils/ui.js';
 import { validateUserInstanceUrl } from './utils/validate.js';
 
-// Apply dark mode from storage immediately to minimise flash before init() runs.
+// Apply the saved theme preference immediately to minimise flash before
+// init() runs. 'system' follows the OS prefers-color-scheme query.
 chrome.storage.local.get('globalSettings', result => {
-  if (result.globalSettings?.darkMode) document.documentElement.dataset.theme = 'dark';
+  applyTheme(resolveTheme(result.globalSettings?.darkMode ?? 'system'));
+});
+
+// When preference is 'system', follow OS theme changes live.
+window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', async () => {
+  const result = await chrome.storage.local.get('globalSettings');
+  const pref = result.globalSettings?.darkMode ?? 'system';
+  if (pref === 'system') applyTheme(resolveTheme(pref));
 });
 
 const SERVICE_META = {
@@ -60,7 +68,7 @@ function debouncedSave(serviceId, patch) {
     delete savePatches[serviceId];
     delete saveTimers[serviceId];
     try { await sendMessage({ action: 'setServiceSettings', serviceId, settings }); }
-    catch (err) { console.error('[Rooroute] Save failed:', err); }
+    catch (err) { console.error('[Switcheroo] Save failed:', err); }
   }, 350);
 }
 
@@ -117,58 +125,72 @@ function buildGlobalSection(globalSettings) {
     const raw = select.value;
     const value = raw === 'null' ? null : Number(raw);
     sendMessage({ action: 'setGlobalSettings', settings: { instanceRefreshIntervalMs: value } })
-      .catch(err => console.error('[Rooroute] setGlobalSettings failed:', err));
+      .catch(err => console.error('[Switcheroo] setGlobalSettings failed:', err));
   });
 
   const hint = document.createElement('p');
   hint.className = 'global-setting-hint';
   hint.textContent =
-    'How often Rooroute fetches updated instance lists from their sources. ' +
+    'How often Switcheroo fetches updated instance lists from their sources. ' +
     'Set to Off to disable all automatic network calls — you can still refresh ' +
     'each list manually using the Refresh button in each service section.';
 
   group.append(lbl, select, hint);
 
-  // Dark mode toggle
+  // Appearance — 3-state theme preference (system / light / dark)
   const dmGroup = document.createElement('div');
   dmGroup.className = 'field-group';
 
   const dmLbl = document.createElement('div');
   dmLbl.className = 'field-label';
+  dmLbl.id = 'appearance-label';
   dmLbl.textContent = 'Appearance';
 
-  const dmRow = document.createElement('div');
-  dmRow.className = 'dark-mode-row';
+  const themeRow = document.createElement('div');
+  themeRow.className = 'mode-selector appearance-selector';
+  themeRow.setAttribute('role', 'radiogroup');
+  themeRow.setAttribute('aria-labelledby', dmLbl.id);
 
-  const dmToggleLabel = document.createElement('label');
-  dmToggleLabel.className = 'toggle';
-  dmToggleLabel.setAttribute('aria-label', 'Enable dark mode');
+  // Normalize any legacy boolean value to the new string form.
+  let currentTheme = globalSettings.darkMode ?? 'system';
+  if (currentTheme === true) currentTheme = 'dark';
+  else if (currentTheme === false) currentTheme = 'light';
 
-  const dmInput = document.createElement('input');
-  dmInput.type = 'checkbox';
-  dmInput.checked = globalSettings.darkMode ?? false;
+  const themeOptions = [
+    { value: 'system', text: 'System' },
+    { value: 'light',  text: 'Light'  },
+    { value: 'dark',   text: 'Dark'   },
+  ];
 
-  const dmTrack = document.createElement('span');
-  dmTrack.className = 'toggle-track';
+  const themeButtons = [];
+  for (const opt of themeOptions) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `mode-btn${opt.value === currentTheme ? ' active' : ''}`;
+    btn.textContent = opt.text;
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', String(opt.value === currentTheme));
+    btn.tabIndex = opt.value === currentTheme ? 0 : -1;
+    themeButtons.push(btn);
 
-  const dmThumb = document.createElement('span');
-  dmThumb.className = 'toggle-thumb';
+    btn.addEventListener('click', () => {
+      setThemePreference(opt.value, themeButtons, themeOptions);
+    });
+    themeRow.append(btn);
+  }
 
-  dmToggleLabel.append(dmInput, dmTrack, dmThumb);
-
-  const dmText = document.createElement('span');
-  dmText.className = 'dark-mode-text';
-  dmText.textContent = 'Dark mode';
-
-  dmInput.addEventListener('change', () => {
-    const dark = dmInput.checked;
-    document.documentElement.dataset.theme = dark ? 'dark' : '';
-    sendMessage({ action: 'setGlobalSettings', settings: { darkMode: dark } })
-      .catch(err => console.error('[Rooroute] setGlobalSettings failed:', err));
+  // Arrow-key navigation for the radiogroup.
+  themeRow.addEventListener('keydown', e => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+    e.preventDefault();
+    const currentIndex = themeButtons.findIndex(b => b.getAttribute('aria-checked') === 'true');
+    const dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
+    const nextIndex = (currentIndex + dir + themeButtons.length) % themeButtons.length;
+    setThemePreference(themeOptions[nextIndex].value, themeButtons, themeOptions);
+    themeButtons[nextIndex].focus();
   });
 
-  dmRow.append(dmToggleLabel, dmText);
-  dmGroup.append(dmLbl, dmRow);
+  dmGroup.append(dmLbl, themeRow);
 
   // Refresh All button
   const refreshAllGroup = document.createElement('div');
@@ -224,10 +246,134 @@ function buildGlobalSection(globalSettings) {
   });
 
   refreshAllGroup.append(refreshAllBtn, refreshAllHint);
-  body.append(group, dmGroup, refreshAllGroup);
+
+  // Data management: import / export / reset
+  const dataGroup = buildDataManagement();
+  body.append(group, dmGroup, refreshAllGroup, dataGroup);
   bodyWrap.append(body);
   section.append(bodyWrap);
   return section;
+}
+
+// ── Data management (import / export / reset) ────────────────────────────────
+
+/**
+ * Builds a row of buttons for exporting, importing, and resetting all settings.
+ * Export downloads a JSON snapshot of {settings, globalSettings}. Import reads
+ * a JSON file, validates the shape, and writes it back to storage. Reset
+ * restores all services + global settings to their defaults.
+ * @returns {HTMLElement}
+ */
+function buildDataManagement() {
+  const group = document.createElement('div');
+  group.className = 'field-group';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'field-label';
+  lbl.textContent = 'Backup & reset';
+
+  const hint = document.createElement('p');
+  hint.className = 'global-setting-hint';
+  hint.textContent = 'Export your configuration to a file, restore it on another browser, or reset everything to defaults.';
+
+  const row = document.createElement('div');
+  row.className = 'data-mgmt-row';
+
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.className = 'btn-data';
+  exportBtn.textContent = 'Export';
+
+  const importBtn = document.createElement('button');
+  importBtn.type = 'button';
+  importBtn.className = 'btn-data';
+  importBtn.textContent = 'Import';
+
+  // Hidden file input so Import opens the native file picker.
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'application/json,.json';
+  fileInput.style.display = 'none';
+
+  const resetBtn = document.createElement('button');
+  resetBtn.type = 'button';
+  resetBtn.className = 'btn-data btn-data--danger';
+  resetBtn.textContent = 'Reset to defaults';
+
+  row.append(exportBtn, importBtn, fileInput, resetBtn);
+
+  exportBtn.addEventListener('click', exportSettings);
+  importBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => importSettings(fileInput));
+  resetBtn.addEventListener('click', resetToDefaults);
+
+  group.append(lbl, hint, row);
+  return group;
+}
+
+/**
+ * Exports {settings, globalSettings, version} as a downloadable JSON file.
+ */
+async function exportSettings() {
+  const [settings, globalSettings] = await Promise.all([
+    sendMessage({ action: 'getSettings' }),
+    sendMessage({ action: 'getGlobalSettings' }),
+  ]);
+  const payload = {
+    app: 'Switcheroo',
+    version: chrome.runtime.getManifest()?.version ?? '',
+    exportedAt: new Date().toISOString(),
+    settings,
+    globalSettings,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  a.download = `switcheroo-settings-${ts}.json`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Reads a JSON file chosen by the user, validates the shape, and writes
+ * settings + globalSettings to storage via a new background action.
+ * @param {HTMLInputElement} fileInput
+ */
+async function importSettings(fileInput) {
+  const file = fileInput.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data || typeof data !== 'object') throw new Error('File is not valid JSON.');
+    if (!data.settings || typeof data.settings !== 'object') throw new Error('Missing "settings" object.');
+    if (!data.globalSettings || typeof data.globalSettings !== 'object') throw new Error('Missing "globalSettings" object.');
+
+    await sendMessage({ action: 'importSettings', settings: data.settings, globalSettings: data.globalSettings });
+    // Re-init to reflect the imported state.
+    await init();
+  } catch (err) {
+    alert(`Import failed: ${err.message}`);
+  } finally {
+    fileInput.value = ''; // allow re-importing the same file
+  }
+}
+
+/**
+ * Confirms with the user, then restores all services and global settings to defaults.
+ */
+async function resetToDefaults() {
+  if (!confirm('Reset all Switcheroo settings to their defaults? This will clear your per-service configuration, instance selection, and excluded URLs. This cannot be undone.')) return;
+  try {
+    await sendMessage({ action: 'resetAllSettings' });
+    await init();
+  } catch (err) {
+    alert(`Reset failed: ${err.message}`);
+  }
 }
 
 // ─── Section builder ──────────────────────────────────────────────────────────
@@ -296,6 +442,7 @@ function buildSection(serviceId, settings, instances, cacheInfo, order = 0) {
       buildModeSelector(serviceId, svc),
       buildFixedPicker(serviceId, svc, instances),
       randomControls,
+      buildExcludedUrls(serviceId, svc),
     );
   }
 
@@ -338,35 +485,92 @@ function buildModeSelector(serviceId, svc) {
 
   const lbl = document.createElement('div');
   lbl.className = 'field-label';
+  lbl.id = `mode-label-${serviceId}`;
   lbl.textContent = 'Redirect mode';
 
   const sel = document.createElement('div');
   sel.className = 'mode-selector';
+  // A radiogroup is the correct semantics for a mutually-exclusive two-option set.
+  sel.setAttribute('role', 'radiogroup');
+  sel.setAttribute('aria-labelledby', lbl.id);
 
   const modes = [
     { value: 'random', text: 'Random' },
     { value: 'fixed',  text: 'Fixed'  },
   ];
 
+  const buttons = [];
   for (const m of modes) {
     const btn = document.createElement('button');
+    btn.type = 'button';
     btn.className = `mode-btn${svc.mode === m.value ? ' active' : ''}`;
     btn.textContent = m.text;
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', String(svc.mode === m.value));
+    btn.tabIndex = svc.mode === m.value ? 0 : -1;
+    buttons.push(btn);
 
     btn.addEventListener('click', () => {
-      sel.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const fixedWrap = document.getElementById(`fixed-wrap-${serviceId}`);
-      const randomControls = document.getElementById(`random-controls-${serviceId}`);
-      if (fixedWrap) fixedWrap.classList.toggle('visible', m.value === 'fixed');
-      if (randomControls) randomControls.classList.toggle('hidden', m.value !== 'random');
-      debouncedSave(serviceId, { mode: m.value });
+      setMode(serviceId, m.value, sel, buttons, modes);
     });
     sel.append(btn);
   }
 
+  // Radiogroup keyboard behaviour: Left/Up moves to previous, Right/Down to next.
+  sel.addEventListener('keydown', e => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+    e.preventDefault();
+    const currentIndex = buttons.findIndex(b => b.getAttribute('aria-checked') === 'true');
+    const dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
+    const nextIndex = (currentIndex + dir + buttons.length) % buttons.length;
+    const next = buttons[nextIndex];
+    setMode(serviceId, modes[nextIndex].value, sel, buttons, modes);
+    next.focus();
+  });
+
   group.append(lbl, sel);
   return group;
+}
+
+/**
+ * Updates the visual + ARIA state of the mode selector and persists the change.
+ * @param {string} serviceId
+ * @param {string} value - 'random' | 'fixed'
+ * @param {HTMLElement} sel - the radiogroup container
+ * @param {HTMLButtonElement[]} buttons
+ * @param {{value:string,text:string}[]} modes
+ */
+function setMode(serviceId, value, sel, buttons, modes) {
+  buttons.forEach((b, i) => {
+    const active = modes[i].value === value;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-checked', String(active));
+    b.tabIndex = active ? 0 : -1;
+  });
+  const fixedWrap = document.getElementById(`fixed-wrap-${serviceId}`);
+  const randomControls = document.getElementById(`random-controls-${serviceId}`);
+  if (fixedWrap) fixedWrap.classList.toggle('visible', value === 'fixed');
+  if (randomControls) randomControls.classList.toggle('hidden', value !== 'random');
+  debouncedSave(serviceId, { mode: value });
+}
+
+/**
+ * Updates the appearance radiogroup visual + ARIA state, applies the effective
+ * theme to the document, and persists the preference.
+ * @param {string} value - 'system' | 'light' | 'dark'
+ * @param {HTMLButtonElement[]} buttons
+ * @param {{value:string,text:string}[]} options
+ */
+function setThemePreference(value, buttons, options) {
+  buttons.forEach((b, i) => {
+    const active = options[i].value === value;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-checked', String(active));
+    b.tabIndex = active ? 0 : -1;
+  });
+  applyTheme(resolveTheme(value));
+  sendMessage({ action: 'setGlobalSettings', settings: { darkMode: value } })
+    .catch(err => console.error('[Switcheroo] setGlobalSettings failed:', err));
 }
 
 // ── Fixed instance picker ─────────────────────────────────────────────────────
@@ -428,7 +632,7 @@ function buildFixedPicker(serviceId, svc, instances) {
     if (select.value) {
       // Include mode: 'fixed' to avoid a race with the debounced mode-button save
       sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: select.value, mode: 'fixed' } })
-        .catch(err => console.error('[Rooroute] Save failed:', err));
+        .catch(err => console.error('[Switcheroo] Save failed:', err));
     }
   });
 
@@ -466,7 +670,7 @@ function buildFixedPicker(serviceId, svc, instances) {
     select.value = normalized;
     // Include mode: 'fixed' to avoid a race with the debounced mode-button save
     sendMessage({ action: 'setServiceSettings', serviceId, settings: { fixedInstance: normalized, mode: 'fixed' } })
-      .catch(err => console.error('[Rooroute] Save failed:', err));
+      .catch(err => console.error('[Switcheroo] Save failed:', err));
     input.value = '';
   });
 
@@ -512,6 +716,46 @@ function buildRotationInterval(serviceId, svc) {
   });
 
   group.append(lbl, select);
+  return group;
+}
+
+// ── Per-URL allowlist (excluded URL prefixes) ─────────────────────────────────
+
+function buildExcludedUrls(serviceId, svc) {
+  const group = document.createElement('div');
+  group.className = 'field-group';
+
+  const lbl = document.createElement('div');
+  lbl.className = 'field-label';
+  lbl.textContent = 'Excluded URLs (never redirect)';
+
+  const hint = document.createElement('p');
+  hint.className = 'global-setting-hint';
+  hint.textContent = `One URL prefix per line. Pages whose URL starts with any of these will stay on ${SERVICE_META[serviceId]?.label ?? serviceId}.`;
+
+  const ta = document.createElement('textarea');
+  ta.className = 'excluded-urls';
+  ta.rows = 3;
+  ta.spellcheck = false;
+  ta.placeholder = 'https://www.youtube.com/feed/subscriptions';
+  ta.value = (Array.isArray(svc.excludedUrls) ? svc.excludedUrls : []).join('\n');
+  ta.setAttribute('aria-label', `Excluded URLs for ${SERVICE_META[serviceId]?.label ?? serviceId}`);
+
+  let saveTimer = null;
+  ta.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      // Split on newlines, trim, drop blanks, dedupe, cap at 100 entries.
+      const lines = ta.value
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      const deduped = Array.from(new Set(lines)).slice(0, 100);
+      debouncedSave(serviceId, { excludedUrls: deduped });
+    }, 600);
+  });
+
+  group.append(lbl, hint, ta);
   return group;
 }
 
@@ -571,11 +815,15 @@ function buildInstanceList(serviceId, svc, instances, cacheInfo) {
   rightRow.append(countEl, refreshBtn);
   headerRow.append(rightRow);
 
-  // Last-fetched timestamp line
+  // Last-fetched timestamp line. The absolute fetchedAt is stored in a data
+  // attribute so a single interval ticker (started in init()) can re-render
+  // all relative timestamps without a full re-build.
   const fetchedEl = document.createElement('div');
   fetchedEl.className = 'instance-list-fetched';
   fetchedEl.id = `last-fetched-${serviceId}`;
-  fetchedEl.textContent = `Fetched: ${formatRelativeTime(cacheInfo?.fetchedAt ?? null)}`;
+  const fetchedAt = cacheInfo?.fetchedAt ?? null;
+  fetchedEl.dataset.fetchedAt = fetchedAt ?? '';
+  fetchedEl.textContent = `Fetched: ${formatRelativeTime(fetchedAt)}`;
 
   const list = buildInstanceRows(serviceId, svc, instances);
   list.id = `list-${serviceId}`;
@@ -726,6 +974,16 @@ function buildRow(serviceId, svc, inst, flag) {
   row.append(cb, content);
   // Clicking the row toggles the checkbox
   row.addEventListener('click', e => { if (e.target !== cb) cb.click(); });
+  // Keyboard: Enter/Space toggle the checkbox, mirroring the click handler
+  row.setAttribute('role', 'button');
+  row.tabIndex = 0;
+  row.setAttribute('aria-label', `Toggle instance ${inst.url.replace('https://', '')}`);
+  row.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.target !== cb) cb.click();
+    }
+  });
 
   return row;
 }
@@ -949,7 +1207,7 @@ function confirmNetworkFetch(serviceLabel, fetchUrl) {
       `Refreshing the <strong>${escHtml(serviceLabel)}</strong> instance list requires a network request to:<br><br>` +
       `<code class="fetch-url">${escHtml(fetchUrl)}</code><br><br>` +
       `This request will reveal to <strong>${escHtml(hostname)}</strong> that you have ` +
-      `Rooroute installed (your IP address and browser User-Agent will be visible). ` +
+      `Switcheroo installed (your IP address and browser User-Agent will be visible). ` +
       `No browsing history or redirect activity is included.<br><br>` +
       `You can enable automatic updates in the <strong>Instance Lists</strong> section above ` +
       `to avoid this prompt in the future.`;
@@ -1071,6 +1329,13 @@ function confirmPrivacyRisk(flag, instanceUrl) {
 async function init() {
   const container = document.getElementById('services-container');
 
+  // Surface the extension version in the header subtitle for support/debugging.
+  const subtitleEl = document.getElementById('page-subtitle');
+  if (subtitleEl) {
+    const version = chrome.runtime.getManifest()?.version;
+    if (version) subtitleEl.textContent = `Hop, redirect, repeat. · v${version}`;
+  }
+
   let settings, globalSettings, allInstances, allCacheInfo;
   try {
     [settings, globalSettings] = await Promise.all([
@@ -1110,5 +1375,27 @@ async function init() {
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
+
+// ── Relative timestamp ticker ────────────────────────────────────────────────
+// Re-renders every "Fetched: Xm ago" line once a minute so the relative times
+// stay accurate while the options page is open. A single interval covers all
+// services; it is cheap (querySelectorAll + textContent) and self-contained.
+const RELATIVE_TICK_MS = 30_000;
+let relativeTickHandle = null;
+
+function refreshRelativeTimestamps() {
+  document.querySelectorAll('[data-fetched-at]').forEach(el => {
+    const raw = el.dataset.fetchedAt;
+    const ts = raw ? Number(raw) : null;
+    el.textContent = `Fetched: ${formatRelativeTime(ts)}`;
+  });
+}
+
+function startRelativeTicker() {
+  if (relativeTickHandle) return; // already running
+  relativeTickHandle = setInterval(refreshRelativeTimestamps, RELATIVE_TICK_MS);
+}
+
+startRelativeTicker();
 
 init();

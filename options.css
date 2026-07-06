@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Rooroute — Options Page
+   Switcheroo — Options Page
    ═══════════════════════════════════════════════════════════════ */
 
 @font-face {
@@ -415,6 +415,29 @@ html, body {
 .custom-url-input:focus { outline: none; border-color: var(--border-focus); }
 .custom-url-input.invalid { border-color: var(--error); }
 
+.excluded-urls {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  padding: 10px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+
+.excluded-urls::placeholder { color: var(--text-muted); font-weight: 400; }
+.excluded-urls:focus { outline: none; border-color: var(--border-focus); }
+
+html[data-theme="dark"] .excluded-urls {
+  background: #2A2118;
+  border-color: #4A3D2E;
+}
+
 .btn-use {
   padding: 10px 16px;
   border-radius: 10px;
@@ -493,16 +516,9 @@ html, body {
   margin-top: 6px;
 }
 
-.dark-mode-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.dark-mode-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
+.appearance-selector {
+  /* 3 options in a compact row; no max-width needed */
+  flex-wrap: wrap;
 }
 
 /* ── Instance rows (restructured with content wrapper) ───────── */
@@ -743,6 +759,42 @@ code {
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Keyboard focus indicators ──────────────────────────────────
+   Visible only for keyboard navigation (Tab key); suppressed for
+   mouse clicks via :focus-visible. Uses --peach-dk for contrast. */
+
+.toggle input:focus-visible + .toggle-track,
+.toggle input:focus-visible ~ .toggle-thumb {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.mode-btn:focus-visible,
+.instance-select:focus-visible,
+.custom-url-input:focus-visible,
+.excluded-urls:focus-visible,
+.btn-use:focus-visible,
+.btn-refresh-list:focus-visible,
+.btn-refresh-all:focus-visible,
+.btn-modal-cancel:focus-visible,
+.btn-modal-confirm:focus-visible,
+.instance-check:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Focusable instance rows get a left-edge highlight ring */
+.instance-row:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.source-link a:focus-visible {
+  outline: 2px solid var(--peach-dk);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 /* ── Privacy-risk confirmation modal ──────────────────────────── */

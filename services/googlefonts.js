@@ -88,6 +88,7 @@ export const googleFontsService = {
       currentInstance: 'https://fonts.bunny.net',
       enabledInstances: ['https://fonts.bunny.net'],
       allowCloudflare: false,
+      excludedUrls: [],             // URL prefixes that should not be redirected
     };
   },
 };

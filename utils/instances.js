@@ -34,7 +34,7 @@ export async function fetchInstances(service) {
     const fetchOpts = { signal: AbortSignal.timeout(8000), ...(service.instanceFetcher.fetchOptions ?? {}) };
     const response = await fetch(service.instanceFetcher.url, fetchOpts);
     if (!response.ok) {
-      console.warn(`[Rooroute] Failed to fetch instances for ${service.id}: HTTP ${response.status}`);
+      console.warn(`[Switcheroo] Failed to fetch instances for ${service.id}: HTTP ${response.status}`);
       return null;
     }
 
@@ -45,7 +45,7 @@ export async function fetchInstances(service) {
     const validated = sanitizeInstanceList(parsed, service.sourceHosts);
 
     if (validated.length === 0) {
-      console.warn(`[Rooroute] No valid instances returned for ${service.id}`);
+      console.warn(`[Switcheroo] No valid instances returned for ${service.id}`);
       return null;
     }
 
@@ -53,7 +53,7 @@ export async function fetchInstances(service) {
     return validated;
 
   } catch (err) {
-    console.warn(`[Rooroute] Error fetching instances for ${service.id}:`, err);
+    console.warn(`[Switcheroo] Error fetching instances for ${service.id}:`, err);
     return null;
   }
 }
@@ -102,7 +102,7 @@ export async function loadFallback(service) {
     if (!Array.isArray(raw)) throw new Error(`Fallback for ${service.id} is not an array`);
     return sanitizeInstanceList(raw, service.sourceHosts);
   } catch (err) {
-    console.error(`[Rooroute] Failed to load fallback for ${service.id}:`, err);
+    console.error(`[Switcheroo] Failed to load fallback for ${service.id}:`, err);
     return [];
   }
 }

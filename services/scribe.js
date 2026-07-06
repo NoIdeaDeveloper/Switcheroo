@@ -112,6 +112,7 @@ export const scribeService = {
       allowCloudflare: false,
       rotationIntervalMs: 3_600_000,
       lastRotatedAt: 0,
+      excludedUrls: [],             // URL prefixes that should not be redirected
     };
   },
 };
